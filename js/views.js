@@ -249,7 +249,7 @@ function renderAISheet() {
   if (a.mode === 'photo' || a.mode === 'text') h += `<label class="f">${a.mode === 'photo' ? '補充說明（選填，會更準）' : '吃了什麼？'}</label>
     <textarea id="aiHint" placeholder="${a.mode === 'photo' ? '例如：飯只吃一半、醬另外放、飲料是無糖' : '例如：7-11 雞胸肉一包、茶葉蛋兩顆、無糖豆漿一瓶'}">${esc(a.hint || '')}</textarea>`;
   h += `<div class="row mt8">${a.mode === 'body' ? '' : `<span class="small muted">餐別</span><select id="aiMeal" style="width:auto">${MEALS.map(m => `<option ${m === a.meal ? 'selected' : ''}>${m}</option>`).join('')}</select>`}
-    <button class="btn pri grow" data-act="aiRun" ${a.busy || noApi ? 'disabled' : ''}>${a.busy ? '<span class="spinner"></span> 分析中…' : '分析'}</button></div>`;
+    <button class="btn pri grow" data-act="aiRun" ${a.busy || noApi ? 'disabled' : ''}>${a.busy ? '<span class="spinner"></span> 分析中，約 10～30 秒…' : '分析'}</button></div>`;
   if (a.err) h += `<div class="note mt8">${esc(a.err)}</div>`;
   if (a.items) {
     h += `<div class="hr"></div><div class="small muted">AI 估算結果，請檢查份量（改克數會自動換算）：</div>`;
@@ -528,7 +528,8 @@ function viewSet() {
     <label class="f">Web App 網址</label><input type="url" id="cfgUrl" value="${esc(S.cfg.apiUrl)}" placeholder="https://script.google.com/macros/s/…/exec">
     <label class="f">通關密語</label><input type="password" id="cfgTok" value="${esc(S.cfg.token)}" autocomplete="off">
     <div class="grid2 mt12"><button class="btn" data-act="testApi">測試連線</button><button class="btn pri" data-act="saveCfg">儲存並同步</button></div>
-    <div class="small muted mt8">${syncStatusText()}</div></div>`;
+    <div class="small muted mt8">${syncStatusText()}</div>
+    ${S.cfg.apiUrl ? '<button class="btn block mt8" data-act="aiTest">測試 AI 辨識速度</button><div id="aiTestBox" class="small mt8"></div>' : ''}</div>`;
   h += `<div class="card"><h2>${icon('scale')} 體重機自動同步</h2>
     <div class="small">bpt care → Apple 健康 → iPhone「捷徑」自動化 → 這裡。量完體重、關掉 bpt care，就會自動送過來。</div>
     <button class="btn block mt8" data-act="guideShortcut">看設定步驟（約 5 分鐘）</button></div>`;

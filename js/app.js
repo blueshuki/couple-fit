@@ -156,7 +156,7 @@ async function runAI() {
   if (a.mode === 'text' && !(a.hint || '').trim()) { toast('請先描述吃了什麼'); return; }
   a.busy = true; a.err = ''; renderAISheet();
   try {
-    const j = await api('analyze', { mode: a.mode === 'text' ? 'food' : a.mode === 'photo' ? 'food' : a.mode, image: a.mode !== 'text' ? a.img : '', hint: a.hint || '' }, 90000);
+    const j = await api('analyze', { mode: a.mode === 'text' ? 'food' : a.mode === 'photo' ? 'food' : a.mode, image: a.mode !== 'text' ? a.img : '', hint: a.hint || '' }, 110000);
     if (a.mode === 'label') { a.label = j.label; if (!a.label) a.err = '讀不到營養標示，請拍正、拍清楚再試一次。'; }
     else if (a.mode === 'body') { a.body = j.body; if (!a.body || !Object.keys(a.body).length) a.err = '讀不到數字，請確認是 bpt care 的報告頁截圖。'; }
     else {
@@ -387,6 +387,16 @@ const ACT = {
     Object.keys(S.records).forEach(id => { if (!S.pending.includes(id)) S.pending.push(id); });
     S.lastTs = 0; persist(); await syncNow(); toast(S.syncErr ? '同步失敗：' + S.syncErr : '已同步', 3000); render(); },
   guideShortcut: () => sheetShortcutGuide(),
+  aiTest: async el => {
+    const box = $('#aiTestBox'); if (!box) return; el.disabled = true; box.innerHTML = '<span class="muted">測試中，最多約 1 分鐘…</span>';
+    try {
+      const j = await api('aiTest', {}, 110000);
+      box.innerHTML = j.results.map(r => `<div>${r.ok ? '✅' : '❌'} <b>${esc(r.model)}</b> · ${r.code} · ${r1(r.ms / 1000)} 秒${r.msg ? `<div class="tiny muted">${esc(r.msg)}</div>` : ''}</div>`).join('')
+        + (j.results.some(r => r.ok) ? '' : '<div class="tiny mt8" style="color:#b0552f">全部失敗：請把這個畫面截圖給開發者。</div>')
+        + (j.results.some(r => r.ok && r.ms > 30000) ? '<div class="tiny mt8" style="color:#b0552f">有模型超過 30 秒，可以在指令碼屬性 GEMINI_MODEL 把最快的那個排第一個。</div>' : '');
+    } catch (e) { box.innerHTML = `<span style="color:#b0552f">${esc(e.message)}</span>`; }
+    el.disabled = false;
+  },
   notif: () => { sheetNotif(); markNotifSeen(); persist(); setBell(); },
   notifGo: el => { const n = notifications().find(x => x.id === el.dataset.id); closeSheet(); if (!n) return; if (n.act === 'tab') { UI.tab = n.v; window.scrollTo(0, 0); render(); } else if (ACT[n.act]) ACT[n.act](el); },
   exportJson: () => { const blob = new Blob([JSON.stringify({ app: 'c17', v: APP_VERSION, at: new Date().toISOString(), records: S.records }, null, 1)], { type: 'application/json' });
