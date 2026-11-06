@@ -93,12 +93,22 @@ function saveFoodItems(items, meal, split) {
 }
 function saveLib(d) { put({ id: newId('lib'), uid: me(), type: 'foodlib', date: '', data: { name: d.name, unit: d.unit, kcal: d.kcal, p: d.p, c: d.c, f: d.f, fib: d.fib, na: d.na } }); }
 function startTpl(k) {
-  const u = me(), d = UI.wdate; const t = TPL[k];
+  const u = me(), d = UI.wdate; const t = getTpl(k); if (!t) return;
   const exercises = t.ex.map(([name, sets]) => {
     const last = lastExercise(u, name, d); const ls = last ? last.ex.sets.filter(x => x.done) : [];
     return { name, sets: Array.from({ length: sets }, (_, i) => ({ kg: ls[i] ? ls[i].kg : (ls[0] ? ls[0].kg : ''), reps: '', done: false })) };
   });
-  const old = session(u, d) || {}; saveSession(u, d, Object.assign({}, old, { tpl: k, exercises, cardio: old.cardio || [] })); render();
+  const old = session(u, d) || {}; saveSession(u, d, Object.assign({}, old, { tpl: k, exercises, cardio: old.cardio || [], finished: false })); render();
+}
+function swapTpl(k) {
+  const u = me(), d = UI.wdate; const t = getTpl(k); if (!t) return; const s = curSession();
+  const kept = (s.exercises || []).map(e => Object.assign({}, e, { sets: e.sets.filter(x => x.done) })).filter(e => e.sets.length);
+  t.ex.forEach(([name, sets]) => {
+    if (kept.some(e => e.name === name)) return;
+    const last = lastExercise(u, name, d); const ls = last ? last.ex.sets.filter(x => x.done) : [];
+    kept.push({ name, sets: Array.from({ length: sets }, (_, i) => ({ kg: ls[i] ? ls[i].kg : (ls[0] ? ls[0].kg : ''), reps: '', done: false })) });
+  });
+  saveSession(u, d, Object.assign({}, s, { tpl: k, exercises: kept, finished: false })); closeSheet(); render(); window.scrollTo(0, 0);
 }
 function curSession() { return session(me(), UI.wdate) || { exercises: [], cardio: [] }; }
 function startRest(sec) { UI.rest = { end: Date.now() + sec * 1000 }; tickRest(); }
@@ -203,7 +213,7 @@ function sendCheer(msg) {
 
 /* ---------- 事件 ---------- */
 const ACT = {
-  tab: el => { UI.tab = el.dataset.tab; if (UI.tab !== 'set') UI.draft = null; window.scrollTo(0, 0); render(); },
+  tab: el => { UI.tab = el.dataset.tab; if (UI.tab !== 'set') { UI.draft = null; UI.previewStage = null; } window.scrollTo(0, 0); render(); },
   syncNow: () => { if (!S.cfg.apiUrl) { UI.tab = 'set'; render(); return; } syncNow().then(() => toast(S.syncErr ? '同步失敗：' + S.syncErr : '已同步')); },
   pickView: el => { UI.view = el.dataset.uid; render(); },
   iam: el => { S.cfg.me = el.dataset.uid; UI.view = null; UI.editUid = el.dataset.uid; UI.draft = null; persist(); if (!hasProfile(S.cfg.me)) UI.tab = 'set'; render(); },
@@ -255,8 +265,13 @@ const ACT = {
     const d = readFoodForm(); const ctx = UI.formCtx;
     if (!d.kcal && !d.p && !d.c && !d.f) { toast('請至少填熱量'); return; }
     const data = { name: d.name, unit: d.unit, qty: d.qty, kcal: d.kcal, p: d.p, c: d.c, f: d.f, fib: d.fib, na: d.na };
-    if (ctx.id) { const r = S.records[ctx.id]; put(Object.assign({}, r, { data: Object.assign({}, r.data, data, { meal: d.meal }) })); }
-    else saveFoodItems([Object.assign(data, { src: 'manual' })], d.meal, readSplit());
+    const split = readSplit();
+    if (ctx.id && split) { // 既有的一筆改成「一起吃」：自己留比例，其餘記到對方
+      const r = S.records[ctx.id]; const gid = newId('g'); const q = d.qty;
+      put(Object.assign({}, r, { data: Object.assign({}, r.data, data, { meal: d.meal, qty: r1(q * split * 100) / 100, gid, by: me() }) }));
+      put(foodRec(Object.assign({}, r.data, data, { meal: d.meal, qty: r1(q * (1 - split) * 100) / 100, gid, by: me(), t: Date.now() }), r.date, otherUid(me())));
+    } else if (ctx.id) { const r = S.records[ctx.id]; put(Object.assign({}, r, { data: Object.assign({}, r.data, data, { meal: d.meal }) })); }
+    else saveFoodItems([Object.assign(data, { src: 'manual' })], d.meal, split);
     if ($('#ff_lib').checked) saveLib(d);
     closeSheet(); render();
   },
@@ -272,6 +287,27 @@ const ACT = {
   wdate: el => { UI.wdate = addDays(UI.wdate, +el.dataset.d); if (UI.wdate > todayStr()) UI.wdate = todayStr(); render(); },
   gotoW: el => { UI.wdate = el.dataset.d; window.scrollTo(0, 0); render(); },
   startTpl: el => startTpl(el.dataset.tpl), addEx: () => sheetAddEx(),
+  changeTpl: () => openSheet(`<h3>換菜單<button class="btn sm ghost x" data-act="closeSheet">關閉</button></h3>
+    <div class="small muted">已經打勾完成的組數會保留，其餘換成新菜單的動作。</div><div class="mt12">${tplPicker(profile(me()), nextTpl(me()), 'swapTpl')}</div>
+    <div class="hr"></div><button class="btn block danger" data-act="clearSession">全部清空，重新選</button>`),
+  swapTpl: el => swapTpl(el.dataset.tpl),
+  clearSession: () => { if (!confirm('清空今天的重訓紀錄（有氧不受影響）？')) return; const s = curSession(); saveSession(me(), UI.wdate, Object.assign({}, s, { tpl: '', exercises: [], finished: false })); closeSheet(); render(); },
+  finishSession: () => { const s = curSession(); const n = (s.exercises || []).reduce((a, e) => a + e.sets.filter(x => x.done).length, 0);
+    if (!n && !confirm('還沒有打勾任何一組，確定結束？')) return;
+    saveSession(me(), UI.wdate, Object.assign({}, s, { finished: true })); UI.rest = null; tickRest(); toast(`已記錄 ${n} 組`); render(); window.scrollTo(0, 0); },
+  reopenSession: () => { const s = curSession(); saveSession(me(), UI.wdate, Object.assign({}, s, { finished: false })); render(); },
+  saveTplSheet: () => { const s = curSession(); const ex = (s.exercises || []).filter(e => e.sets.length); if (!ex.length) { toast('先加入動作'); return; }
+    openSheet(`<h3>存成我的菜單<button class="btn sm ghost x" data-act="closeSheet">取消</button></h3>
+      <label class="f">菜單名稱</label><input type="text" id="tplName" maxlength="20" placeholder="例如：臀腿日、上半身推" value="">
+      <div class="small muted mt8">${ex.map(e => `${esc(e.name)} ${e.sets.length} 組`).join('<br>')}</div>
+      <div class="tiny muted mt8">會記住動作和組數，重量每次自動帶入上次的數字。兩人都可以使用。</div>
+      <button class="btn pri block mt12" data-act="saveTpl">儲存</button>`); },
+  saveTpl: () => { const name = $('#tplName').value.trim(); if (!name) { toast('請取個名字'); return; } const s = curSession();
+    const ex = s.exercises.filter(e => e.sets.length).map(e => { const [lo, hi] = tplRange(s.tpl, e.name); return [e.name, e.sets.length, `${lo}-${hi}`]; });
+    const id = newId('tpl'); put({ id, uid: me(), type: 'tpl', date: '', data: { name, ex } });
+    saveSession(me(), UI.wdate, Object.assign({}, s, { tpl: id })); closeSheet(); toast('已存成「' + name + '」'); render(); },
+  delTpl: el => { const r = S.records[el.dataset.id]; if (!r || !confirm(`刪除菜單「${r.data.name}」？（過去的訓練紀錄不受影響）`)) return; removeRec(r.id); render(); },
+  jersey: el => { UI.draft.p.avatar.jersey = el.dataset.v; $$('[data-act="jersey"]').forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); },
   exPick: el => {
     const name = el.dataset.n; const s = curSession(); const last = lastExercise(me(), name, UI.wdate); const ls = last ? last.ex.sets.filter(x => x.done) : [];
     s.exercises = s.exercises || []; s.exercises.push({ name, sets: (ls.length ? ls : [{}, {}, {}]).map(x => ({ kg: x.kg ?? '', reps: '', done: false })) });
@@ -318,8 +354,11 @@ const ACT = {
   photoPose: el => { UI.photo.pose = el.dataset.v; UI.photo.a = UI.photo.b = ''; render(); },
   photoAdd: () => { if (!S.cfg.apiUrl) { toast('請先完成雲端設定'); return; } $('#phFile').click(); },
   // 設定
-  editUid: el => { UI.editUid = el.dataset.uid; UI.draft = null; render(); },
-  sw: el => { UI.draft.p.avatar[el.dataset.k] = el.dataset.v; $$(`.sw[data-k="${el.dataset.k}"]`).forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); },
+  editUid: el => { UI.editUid = el.dataset.uid; UI.draft = null; UI.previewStage = null; render(); },
+  previewStage: el => { UI.previewStage = el.dataset.v; $$('[data-act="previewStage"]').forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); },
+  sw: el => { const k = el.dataset.k; const av = UI.draft.p.avatar;
+    if (k.startsWith('oc:')) { const oid = v2OutfitId(av); av.oc = av.oc || {}; av.oc[oid] = Object.assign({}, av.oc[oid], { [k.slice(3)]: el.dataset.v }); $$(`.sw[data-k="${k}"]`).forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); return; }
+    UI.draft.p.avatar[el.dataset.k] = el.dataset.v; $$(`.sw[data-k="${el.dataset.k}"]`).forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); },
   saveProfile: () => {
     const p = readProfileForm();
     if (!(p.height > 120 && p.height < 230)) { toast('請確認身高'); return; }
@@ -349,14 +388,21 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const el = e.target; const c = el.dataset.chg;
-  if (c === 'set') { const s = curSession(); const st = s.exercises[+el.dataset.ei].sets[+el.dataset.si]; st[el.dataset.k] = el.value === '' ? '' : num(el.value); saveSession(me(), UI.wdate, s); return; }
+  if (c === 'set') {
+    const s = curSession(); const ei = +el.dataset.ei, si = +el.dataset.si, k = el.dataset.k; const e = s.exercises[ei]; const st = e.sets[si];
+    const old = st[k]; const v = el.value === '' ? '' : num(el.value); st[k] = v;
+    if (k === 'kg' && v !== '') e.sets.forEach((x, j) => { // 後面還沒做的組，沿用這一組的重量
+      if (j > si && !x.done && (x.kg === '' || x.kg == null || x.kg === old)) { x.kg = v; const inp = $(`input[data-chg="set"][data-ei="${ei}"][data-si="${j}"][data-k="kg"]`); if (inp) inp.value = v; }
+    });
+    saveSession(me(), UI.wdate, s); return;
+  }
   if (c === 'steps') { saveDaily(me(), UI.wdate, { steps: num(el.value) || '' }); return; }
   if (c === 'progEx') { UI.progEx = el.value; render(); return; }
   if (c === 'month') { UI.month = el.value; render(); return; }
   if (c === 'phA' || c === 'phB') { UI.photo[c === 'phA' ? 'a' : 'b'] = el.value; UI.photo.manual = true; loadCompare(); return; }
   if (c === 'aiOn') { UI.ai.items[+el.dataset.i].on = el.checked; el.closest('.ai-item').classList.toggle('off', !el.checked); aiTotals(); return; }
   if (el.id === 'aiMeal' && UI.ai) { UI.ai.meal = el.value; const b = $('[data-act="aiSave"],[data-act="lbSave"]'); if (b) b.textContent = '加入' + el.value; return; }
-  if ((el.dataset.pf || el.dataset.av) && UI.tab === 'set') { if (el.dataset.pf === 'sex') { readProfileForm(); render(); return; } refreshPreview(); }
+  if ((el.dataset.pf || el.dataset.av) && UI.tab === 'set') { if (el.dataset.pf === 'sex' || el.dataset.av === 'outfit' || el.dataset.av === 'charV2') { readProfileForm(); render(); return; } refreshPreview(); }
 });
 document.addEventListener('input', e => {
   const el = e.target; const a = UI.ai; const k = el.dataset.inp;

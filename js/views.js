@@ -17,7 +17,7 @@ function viewHome() {
     const p = profile(u); const has = hasProfile(u); const tg = targets(u); const s = dayFood(u, t); const pct = progressPct(u);
     h += `<div class="pcard ${u === 'B' ? 'b' : ''} ${u === v ? 'sel' : ''}" data-act="pickView" data-uid="${u}">
       ${u === me() ? '<span class="me-tag">我</span>' : ''}
-      ${avatarSVG(p.avatar, fatness(u), { expr: has ? exprFor(u) : 'smile' })}
+      ${renderAvatar(u, p.avatar, fatness(u), { expr: has ? exprFor(u) : 'calm' })}
       <div class="nm">${esc(p.name)}</div>
       ${has ? `<div class="stat">${diamondSVG(pct, colorOf(u), 40)}<div class="t"><b>${baseName(pct)}</b> ${r0(pct)}%<br><span class="muted">${r1(trendWeight(u))} kg · ${r0(s.kcal)}/${tg.kcal}</span></div></div>`
         : `<div class="small muted mt8">${u === me() ? '請先到「設定」填資料' : '等對方在自己手機設定'}</div>`}
@@ -117,7 +117,7 @@ function weekReviewCard(v, end) {
 }
 function viewWelcome() {
   return `<div class="card center" style="margin-top:20px">
-    <div class="row" style="justify-content:center;gap:0">${avatarSVG(profile('A').avatar, 0.3).replace('class="av"', 'class="av" style="width:110px"')}${avatarSVG(profile('B').avatar, 0.3, { expr: 'happy' }).replace('class="av"', 'class="av" style="width:110px"')}</div>
+    <div class="row" style="justify-content:center;gap:0">${renderAvatar('A', profile('A').avatar, 0.3).replace('class="av', 'style="width:110px;max-height:240px" class="av')}${renderAvatar('B', profile('B').avatar, 0.3, { expr: 'laugh' }).replace('class="av', 'style="width:110px;max-height:240px" class="av')}</div>
     <div class="row" style="justify-content:center;gap:4px">${catSVG('orange', 'loaf', 40)}${catSVG('tabby', 'loaf', 40)}</div>
     <h2 style="justify-content:center;font-size:18px">兩人減脂</h2>
     <p class="muted small">每個人用自己的手機選自己的身分。<br>資料會透過你們的 Google 試算表同步。</p>
@@ -163,7 +163,8 @@ function viewFood() {
        <button class="btn" data-act="manual">${icon('pen')}手動</button>
      </div>
      <div class="row mt12"><button class="btn sm ${dd.gameDay ? 'gold' : ''}" data-act="gameDay">⚾ ${dd.gameDay ? '今天是看球日' : '今天去看球'}</button><span class="grow"></span>
-     <span class="small muted">喝水 ${r0(num(dd.waterMl))} ml</span><button class="btn sm" data-act="water" data-n="250">+250</button></div></div>`;
+     <span class="small muted">喝水 ${r0(num(dd.waterMl))} ml</span><button class="btn sm" data-act="water" data-n="250">+250</button></div>
+     ${hasProfile(otherUid(u)) && !recs('food').some(r => r.data.gid) ? `<div class="tiny muted mt8">兩人一起吃？新增食物時勾「和 ${esc(nameOf(otherUid(u)))} 一起吃」，會依比例自動記到兩人帳上。</div>` : ''}</div>`;
   h += '<div class="card flat">';
   MEALS.forEach(m => {
     const list = ents.filter(e => e.data.meal === m); const ms = sumFood(list);
@@ -219,7 +220,7 @@ function sheetFoodForm(opts) {
     <div><label class="f">脂肪 g</label><input type="number" inputmode="decimal" id="ff_f" value="${d.f}"></div><div><label class="f">纖維 g</label><input type="number" inputmode="decimal" id="ff_fib" value="${d.fib}"></div><div><label class="f">鈉 mg</label><input type="number" inputmode="decimal" id="ff_na" value="${d.na ?? ''}"></div></div>
     <label class="f">餐別</label><select id="ff_meal">${MEALS.map(m => `<option ${m === (opts.meal || d.meal || defaultMeal()) ? 'selected' : ''}>${m}</option>`).join('')}</select>
     <div class="small muted mt8" id="ff_chk"></div>
-    ${opts.id ? '' : splitHTML()}
+    ${opts.id && opts.data.gid ? '<div class="tiny muted mt8">這筆是「一起吃」分開記的其中一份。</div>' : splitHTML()}
     <label class="row small mt8"><input type="checkbox" id="ff_lib" ${opts.saveLib ? 'checked' : ''}> 存到「我們的常用」</label>
     <div class="grid2 mt12">${opts.id ? '<button class="btn danger" data-act="delFood">刪除</button>' : '<span></span>'}<button class="btn pri" data-act="saveFood">${opts.id ? '儲存' : '加入'}</button></div>`);
   const chk = () => { const k = num($('#ff_kcal').value), m = num($('#ff_p').value) * 4 + num($('#ff_c').value) * 4 + num($('#ff_f').value) * 9;
@@ -288,12 +289,15 @@ function viewGym() {
   if (!me()) return viewWelcome();
   const u = me(), d = UI.wdate; const s = session(u, d); const p = profile(u); const nt = nextTpl(u);
   let h = `<div class="datebar"><button class="btn sm" data-act="wdate" data-d="-1">‹</button><b>${prettyDate(d)}</b><button class="btn sm" data-act="wdate" data-d="1" ${d >= todayStr() ? 'disabled' : ''}>›</button></div>`;
-  h += '<div class="card"><h2>重量訓練' + (s && s.tpl ? `<span class="chip navy">${esc(TPL[s.tpl] ? TPL[s.tpl].name : s.tpl)}</span>` : '') + '</h2>';
+  const tn = s && s.tpl && getTpl(s.tpl) ? getTpl(s.tpl).name : '';
+  h += '<div class="card"><h2>重量訓練' + (tn ? `<span class="chip navy">${esc(tn)}</span>` : '') + (s && s.finished ? '<span class="chip gold">已完成</span>' : '') + '</h2>';
   if (!s || !(s.exercises || []).length) {
-    const rot = [...new Set(ROTATION[clamp(num(p.trainDays) || 3, 1, 6)])];
-    h += `<p class="small muted" style="margin-top:0">今天的先發是 <b>${TPL[nt].name}</b>，會自動帶入上次的重量。</p><div class="row wrap">`;
-    rot.forEach(k => { h += `<button class="btn ${k === nt ? 'pri' : ''}" data-act="startTpl" data-tpl="${k}">開始 ${TPL[k].name}</button>`; });
-    h += '<button class="btn" data-act="addEx">空白，自己加動作</button></div>';
+    h += `<p class="small muted" style="margin-top:0">今天的先發是 <b>${TPL[nt].name}</b>，會自動帶入上次的重量。</p>` + tplPicker(p, nt, 'startTpl');
+  } else if (s.finished) {
+    const st = sessionStats(u, d);
+    h += `<div class="small">${s.exercises.filter(e => e.sets.some(x => x.done)).map(e => `<b>${esc(e.name)}</b>　${e.sets.filter(x => x.done).map(x => (exUnit(e.name) === 'sec' ? '' : r1(x.kg) + '×') + r0(x.reps) + (exUnit(e.name) === 'sec' ? '秒' : '')).join('、')}`).join('<br>') || '沒有完成的組數'}</div>
+      <div class="kv mt12"><div><b>${st.sets}</b><span>完成組數</span></div><div><b>${r0(st.vol).toLocaleString()} kg</b><span>總訓練量</span></div></div>
+      <div class="grid2 mt12"><button class="btn" data-act="reopenSession">繼續訓練</button><button class="btn" data-act="saveTplSheet">存成我的菜單</button></div>`;
   } else {
     s.exercises.forEach((e, ei) => {
       const unit = exUnit(e.name); const last = lastExercise(u, e.name, d); const [lo, hi] = tplRange(s.tpl, e.name);
@@ -311,7 +315,9 @@ function viewGym() {
       });
       h += `</table><div class="row mt8"><button class="btn sm" data-act="addSet" data-ei="${ei}">＋ 一組</button>${e.sets.length > 1 ? `<button class="btn sm ghost" data-act="delSet" data-ei="${ei}">− 刪最後一組</button>` : ''}</div></div>`;
     });
-    h += '<button class="btn block" data-act="addEx">＋ 新增動作</button>';
+    h += `<button class="btn block" data-act="addEx">＋ 新增動作</button>
+      <div class="grid2 mt8"><button class="btn" data-act="changeTpl">換菜單</button><button class="btn" data-act="saveTplSheet">存成我的菜單</button></div>
+      <button class="btn gold block mt8" data-act="finishSession">完成今天的訓練</button>`;
   }
   h += '</div>';
   // 對方今天
@@ -342,15 +348,27 @@ function viewGym() {
   const hist = sessionsOf(u).filter(r => r.date !== d).slice(0, 8);
   if (hist.length) {
     h += '<div class="card"><h2>最近訓練</h2>';
-    hist.forEach(r => { const st = sessionStats(u, r.date); h += `<div class="ent" data-act="gotoW" data-d="${r.date}"><div class="grow"><div class="nm">${prettyDate(r.date)}${r.data.tpl && TPL[r.data.tpl] ? ' · ' + TPL[r.data.tpl].name : ''}</div><div class="mc">${st.exN} 個動作 · ${st.sets} 組 · 總量 ${r0(st.vol).toLocaleString()} kg${st.cardioMin ? ' · 有氧 ' + st.cardioMin + ' 分' : ''}</div></div><span class="muted">›</span></div>`; });
+    hist.forEach(r => { const st = sessionStats(u, r.date); h += `<div class="ent" data-act="gotoW" data-d="${r.date}"><div class="grow"><div class="nm">${prettyDate(r.date)}${r.data.tpl && getTpl(r.data.tpl) ? ' · ' + esc(getTpl(r.data.tpl).name) : ''}</div><div class="mc">${st.exN} 個動作 · ${st.sets} 組 · 總量 ${r0(st.vol).toLocaleString()} kg${st.cardioMin ? ' · 有氧 ' + st.cardioMin + ' 分' : ''}</div></div><span class="muted">›</span></div>`; });
     h += '</div>';
   }
+  return h;
+}
+function tplPicker(p, nt, act) {
+  const rot = [...new Set(ROTATION[clamp(num(p.trainDays) || 3, 1, 6)])]; const cts = customTpls();
+  let h = '<div class="small muted">先發輪值</div><div class="row rwrap mt8">';
+  rot.forEach(k => { h += `<button class="btn ${k === nt ? 'pri' : ''}" data-act="${act}" data-tpl="${k}">${TPL[k].name}</button>`; });
+  h += '</div>';
+  if (cts.length) { h += '<div class="small muted mt12">我們的菜單</div><div class="row rwrap mt8">'; cts.forEach(t => { h += `<button class="btn" data-act="${act}" data-tpl="${t.key}">${esc(t.name)}</button>`; }); h += '</div>'; }
+  if (act === 'startTpl') h += '<button class="btn block mt12" data-act="addEx">空白，自己加動作</button>';
   return h;
 }
 function planHTML(p) {
   const n = clamp(num(p.trainDays) || 3, 1, 6); const rot = [...new Set(ROTATION[n])];
   let h = `<div class="small mt8">${n <= 3 ? `每週 ${n} 次全身訓練，A／B 輪流（例如一三五）。` : `每週 ${n} 次上下肢分開，上肢 1 → 下肢 1 → 上肢 2 → 下肢 2 輪流${n > 4 ? '，多出的天數做有氧或休息' : ''}。`}</div>`;
   rot.forEach(k => { h += `<div class="tpl"><b>${TPL[k].name}</b>${TPL[k].ex.map(e => `${e[0]} ${e[1]}×${e[2]}${exUnit(e[0]) === 'sec' ? '秒' : ''}`).join('<br>')}</div>`; });
+  const cts = customTpls();
+  h += `<div class="small mt12"><b>我們的菜單</b>${cts.length ? '' : '：還沒有。用「空白，自己加動作」排好動作，再按「存成我的菜單」就會出現在這裡，兩人都看得到。'}</div>`;
+  cts.forEach(t => { h += `<div class="tpl"><div class="row"><b class="grow">${esc(t.name)}</b><span class="tiny muted">${esc(nameOf(t.uid))} 建立</span><button class="btn sm ghost danger" data-act="delTpl" data-id="${t.key}">刪除</button></div>${t.ex.map(e => `${esc(e[0])} ${e[1]}×${esc(e[2])}`).join('<br>')}</div>`; });
   h += `<div class="small"><b>進步規則</b>：每組都做到次數上限、動作仍標準 → 下次加重；做不到下限 → 維持重量。每組保留 1～2 下的餘力。<br>
   <b>組間休息</b>：大動作 2 分鐘、小動作 60～90 秒。<br>
   <b>有氧</b>：每週 2～3 次、20～40 分鐘坡度走（速度 4.5～5.5、坡度 6～12%），強度是「能說話但不能唱歌」。<br>
@@ -502,13 +520,7 @@ function viewSet() {
     <label class="f">每週重訓次數</label><select data-pf="trainDays">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${num(p.trainDays) === n ? 'selected' : ''}>${n} 次</option>`).join('')}</select>
     ${p.sex === 'F' ? `<div class="grid2"><div><label class="f">平常週期天數</label><input type="number" data-pf="cycleLen" value="${p.cycleLen}"></div><div><label class="f">經期天數</label><input type="number" data-pf="periodLen" value="${p.periodLen}"></div></div><div class="tiny muted mt8">記錄 2 次以上經期後，會改用實際平均週期。</div>` : ''}
     <label class="row small mt12"><input type="checkbox" data-pf="remind" ${p.remind !== false ? 'checked' : ''}> LINE 提醒（需另外設定 LINE，見下方）</label>
-    <div class="hr"></div><b class="small">外觀</b>
-    <div class="grid2"><div><label class="f">服裝</label><select data-av="outfit">${Object.entries(OUTFITS).map(([k, o]) => `<option value="${k}" ${av.outfit === k ? 'selected' : ''}>${o.name}</option>`).join('')}</select></div>
-    <div><label class="f">髮型</label><select data-av="hair">${Object.entries(HAIRS).map(([k, v]) => `<option value="${k}" ${av.hair === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    <div><label class="f">表情</label><select data-av="expr">${Object.entries(EXPRS).map(([k, v]) => `<option value="${k}" ${av.expr === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    <div><label class="f">背號（棒球衣）</label><input type="text" maxlength="2" data-av="no" value="${esc(av.no || '')}" placeholder="例如 52"></div></div>
-    ${swRow('上衣', 'top', SW_CLOTH, av.top)}${swRow(av.outfit === 'dress' ? '裙子' : '褲子', 'bottom', SW_CLOTH, av.bottom)}${swRow('滾邊／條紋', 'trim', SW_CLOTH, av.trim)}${swRow('髮色', 'hairColor', SW_HAIR, av.hairColor)}${swRow('膚色', 'skin', SW_SKIN, av.skin)}
-    <div class="tiny muted mt8">人物身形會隨「7 日平均體重」慢慢改變；表情選「自動」時，會依當天睡眠、訓練、飲食變化。</div>
+    ${appearanceHTML(eu, p, av)}
     <button class="btn pri block mt12" data-act="saveProfile">儲存個人資料</button></div>`;
   h += `<div class="card"><h2>雲端同步（Google Apps Script）</h2>
     <label class="f">Web App 網址</label><input type="url" id="cfgUrl" value="${esc(S.cfg.apiUrl)}" placeholder="https://script.google.com/macros/s/…/exec">
@@ -530,17 +542,37 @@ function viewSet() {
     <button class="btn sm danger mt8" data-act="resetLocal">清除這支手機的資料</button></div>`;
   return h;
 }
+function appearanceHTML(eu, p, av) {
+  const v2 = v2On(eu, av); const hasV2 = typeof CHAR_ASSETS !== 'undefined' && !!CHAR_ASSETS[eu];
+  let h = '<div class="hr"></div><b class="small">外觀</b>';
+  if (hasV2) h += `<label class="row small mt8"><input type="checkbox" data-av="charV2" ${av.charV2 !== false ? 'checked' : ''}> 使用定稿人物</label>`;
+  const outfits = v2 ? Object.entries(V2_OUTFIT_NAMES) : Object.entries(OUTFITS).map(([k, o]) => [k, o.name]);
+  const cur = v2 && !V2_OUTFIT_NAMES[av.outfit] ? 'stripe' : av.outfit;
+  h += `<div class="grid2"><div><label class="f">服裝</label><select data-av="outfit">${outfits.map(([k, n]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`;
+  if (!v2) h += `<div><label class="f">髮型</label><select data-av="hair">${Object.entries(HAIRS).map(([k, v]) => `<option value="${k}" ${av.hair === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+  h += `<div><label class="f">表情</label><select data-av="expr">${Object.entries(EXPRS).map(([k, v]) => `<option value="${k}" ${(av.expr === 'auto' || !av.expr ? 'auto' : normExpr(av.expr)) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`;
+  if (cur === 'jersey') h += `<div><label class="f">背號</label><input type="text" inputmode="numeric" maxlength="2" data-av="no" value="${esc(av.no || '')}" placeholder="例如 52"></div>`;
+  h += '</div>';
+  if (cur === 'jersey') h += `<label class="f">球衣配色</label><div class="seg">${Object.entries(JERSEY).map(([k, j]) => `<button class="${(av.jersey || 'yellow') === k ? 'on' : ''}" data-act="jersey" data-v="${k}">${j.name}</button>`).join('')}</div>`;
+  else if (v2) { const oid = v2OutfitId(Object.assign({}, av, { outfit: cur })); v2Recolor(eu, oid).forEach(([r, lb]) => { const O = CHAR_CACHE[eu + '/' + oid]; h += swRow(lb || V2_ROLE_NAMES[r] || r, 'oc:' + r, SW_CLOTH, (av.oc && av.oc[oid] && av.oc[oid][r]) || (O && O.colors[r]) || ''); }); }
+  else h += swRow('上衣', 'top', SW_CLOTH, av.top) + swRow(av.outfit === 'dress' ? '裙子' : '褲子', 'bottom', SW_CLOTH, av.bottom) + swRow('滾邊／條紋', 'trim', SW_CLOTH, av.trim);
+  h += swRow('髮色', 'hairColor', SW_HAIR, av.hairColor) + swRow('膚色', 'skin', SW_SKIN, av.skin);
+  if (v2) h += `<label class="f">預覽身形（實際會依目標進度自動變化）</label><div class="seg">${CHAR_STAGES.map(k => `<button class="${(UI.previewStage || (hasProfile(eu) ? bodyStage(eu) : 'neutral')) === k ? 'on' : ''}" data-act="previewStage" data-v="${k}">${STAGE_NAMES[k]}</button>`).join('')}</div>
+    <div class="tiny muted mt8">身形依目標進度變化：起點 → 進度 50% 勻稱 → 達標結實；體重比起始多 2% 豐潤、多 4% 圓潤。</div>`;
+  else h += '<div class="tiny muted mt8">人物身形會隨「7 日平均體重」慢慢改變；表情選「自動」時，會依當天睡眠、訓練、飲食變化。</div>';
+  return h;
+}
 function swRow(label, key, list, cur) { return `<label class="f">${label}</label><div class="swatches">${list.map(c => `<button class="sw ${c.toLowerCase() === String(cur).toLowerCase() ? 'on' : ''}" style="background:${c}" data-act="sw" data-k="${key}" data-v="${c}" aria-label="${c}"></button>`).join('')}</div>`; }
 function previewFat(p) { const h = num(p.height) / 100; const u = UI.draft && UI.draft.uid; const w = u && weights(u).length ? trendWeight(u) : num(p.startWeight); return h ? clamp((w / (h * h) - 18.5) / (33 - 18.5), 0, 1) : 0.3; }
 function readProfileForm() {
   const p = UI.draft.p;
   $$('[data-pf]').forEach(el => { const k = el.dataset.pf; if (el.type === 'checkbox') p[k] = el.checked; else if (['name', 'sex'].includes(k)) p[k] = el.value; else p[k] = num(el.value); });
-  $$('[data-av]').forEach(el => { p.avatar[el.dataset.av] = el.value; });
+  $$('[data-av]').forEach(el => { p.avatar[el.dataset.av] = el.type === 'checkbox' ? el.checked : el.value; });
   return p;
 }
 function refreshPreview() {
   const p = readProfileForm(); const box = $('#avPrev'); if (!box) return;
-  box.innerHTML = avatarSVG(p.avatar, previewFat(p), { expr: p.avatar.expr === 'auto' ? 'smile' : p.avatar.expr });
+  box.innerHTML = renderAvatar(UI.draft.uid, p.avatar, previewFat(p), { expr: p.avatar.expr === 'auto' ? 'calm' : p.avatar.expr, stage: UI.previewStage });
   const h = num(p.height) / 100, g = num(p.goalWeight); const el = $('#goalChk');
   if (el && h && g) { const bmi = g / (h * h); el.textContent = `目標 BMI ${r1(bmi)}` + (bmi < 18.5 ? '，低於 18.5 屬體重過輕，建議把目標放在增肌或維持。' : (bmi < 20 ? '，已在偏瘦範圍，之後建議以腰圍和力量進步為主要目標。' : '')); }
 }

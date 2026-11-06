@@ -15,32 +15,38 @@ const OUTFITS = {
   jersey: { name: '棒球衣＋球褲', top: 'jersey', bottom: 'basepants' },
   dress: { name: '洋裝', top: 'dress', bottom: 'none' },
 };
-const HAIRS = { bob: '鮑伯頭', curly: '捲髮', long: '長直髮', bun: '包包頭', short: '短髮', buzz: '平頭' };
-const EXPRS = { auto: '自動（依今日狀態）', smile: '微笑', happy: '開心', calm: '溫和', proud: '有幹勁', sleepy: '想睡', sweat: '流汗' };
-const SW_CLOTH = ['#ffffff', '#f7f4ec', '#ffd23f', '#f5b800', '#1f2d4d', '#3d4352', '#5b7aa6', '#8a7a52', '#e9e2d0', '#d9a5a0', '#9cb59a', '#2b2b2b'];
-const SW_HAIR = ['#2a1e17', '#4a3426', '#6b4a32', '#8a5a3c', '#b98a5e', '#9a9a9a'];
-const SW_SKIN = ['#fde7d6', '#f9dcc6', '#f2c9aa', '#e2ac86', '#c08a64', '#8f5f43'];
+const JERSEY = { yellow: { name: '黃衫（藍線）', top: '#ffd23f', trim: '#1f2d4d' }, navy: { name: '藍衫（黃線）', top: '#1f2d4d', trim: '#ffd23f' } };
+const HAIRS = { bob: '鮑伯頭（側分）', bobc: '鮑伯頭（中分）', curly: '捲髮', long: '長直髮', bun: '包包頭', short: '短髮', buzz: '平頭' };
+const EXPRS = { auto: '自動（依今日狀態）', calm: '微笑', laugh: '開心大笑', wink: '眨眼', tongue_out: '吐舌', pout: '嘟嘴', surprised: '驚訝', proud: '有幹勁', exhausted: '累癱', cry: '哭哭', sleepy: '想睡' };
+// 舊版存的表情名稱 → 新名稱；新名稱 → 舊版參數化人物能畫的表情
+const EXPR_LEGACY = { smile: 'calm', happy: 'laugh', sweat: 'exhausted' };
+const EXPR_OLD = { calm: 'smile', laugh: 'happy', wink: 'smile', tongue_out: 'happy', pout: 'calm', surprised: 'happy', proud: 'proud', exhausted: 'sweat', cry: 'sweat', sleepy: 'sleepy' };
+function normExpr(e) { return EXPR_LEGACY[e] || (EXPRS[e] ? e : 'calm'); }
+const SW_CLOTH = ['#fcf5e9', '#727b80', '#424247', '#ffffff', '#f7f4ec', '#ffd23f', '#f5b800', '#1f2d4d', '#3d4352', '#5b7aa6', '#8a7a52', '#e9e2d0', '#d9a5a0', '#9cb59a', '#2b2b2b'];
+const SW_HAIR = ['#54453c', '#5f4436', '#2a1e17', '#4a3426', '#6b4a32', '#8a5a3c', '#b98a5e', '#9a9a9a'];
+const SW_SKIN = ['#fed9b2', '#fed4b2', '#fde7d6', '#f9dcc6', '#f2c9aa', '#e2ac86', '#c08a64', '#8f5f43'];
 
 /* ---------- Q 版人物 ---------- */
 function avatarSVG(av, f, opt = {}) {
   f = clamp(f, 0, 1); const id = 'av' + (++_svgSeq); const sw = 2; const cx = 60;
   const O = OUTFITS[av.outfit] || OUTFITS.pocket;
-  const expr = opt.expr || (av.expr && av.expr !== 'auto' ? av.expr : 'smile');
-  const skin = av.skin, top = av.top, bot = av.bottom, trim = av.trim || '#1f2d4d', hair = av.hairColor;
-  const sh = 14 + 4 * f, hp = 13.5 + 10 * f, yS = 80, yH = 116, yC = 122, yA = 156;
-  const aw = 7.5 + 4 * f, lw = 10 + 6.5 * f, lo = 6 + 4 * f;
+  let expr = opt.expr || (av.expr && av.expr !== 'auto' ? av.expr : 'smile'); expr = EXPR_OLD[expr] || expr;
+  const J = av.outfit === 'jersey' ? (JERSEY[av.jersey] || JERSEY.yellow) : null;
+  const skin = av.skin, top = J ? J.top : av.top, bot = J ? '#f7f4ec' : av.bottom, trim = J ? J.trim : (av.trim || '#1f2d4d'), hair = av.hairColor;
+  const sh = 18.5 + 3 * f, hp = 17 + 8 * f, yS = 79, yH = 116, yC = 122, yA = 156;
+  const aw = 9 + 3 * f, lw = 12 + 5 * f, lo = 7 + 3.5 * f;
   const hw = 30 + 1.5 * f, L = cx - hw, R = cx + hw;
   const ln = (x1, y1, x2, y2, w, col) => `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="${w.toFixed(1)}" stroke-linecap="round"/>`;
   const limb = (a, w, col) => ln(a[0], a[1], a[2], a[3], w + sw * 2, INK) + ln(a[0], a[1], a[2], a[3], w, col);
   const part = (a, t) => [a[0], a[1], a[0] + (a[2] - a[0]) * t, a[1] + (a[3] - a[1]) * t];
   const torso = (hem, flare) => { const bx = hp + flare; return `M${cx - sh},${yS} C${cx - sh - 1},${yS + 14} ${cx - hp - 3 - 7 * f},${hem - 14} ${cx - bx},${hem} L${cx + bx},${hem} C${cx + hp + 3 + 7 * f},${hem - 14} ${cx + sh + 1},${yS + 14} ${cx + sh},${yS} Q${cx},${yS - 5} ${cx - sh},${yS} Z`; };
   const P = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" stroke="${INK}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round" ${extra}/>`;
-  const aL = [cx - sh + 3, yS + 4, cx - sh - 5 - 4 * f, yS + 32], aR = [cx + sh - 3, yS + 4, cx + sh + 5 + 4 * f, yS + 32];
+  const aL = [cx - sh + 4, yS + 5, cx - sh - 1.5 - 2 * f, yS + 31], aR = [cx + sh - 4, yS + 5, cx + sh + 1.5 + 2 * f, yS + 31];
   const legs = [[cx - lo, yC - 6, cx - lo, yA], [cx + lo, yC - 6, cx + lo, yA]];
   let g = '', defs = '';
 
   /* 後髮 */
-  if (av.hair === 'bob') g += P(`M${L - 1},44 C${L - 4},62 ${L - 3},76 ${L + 4},80 L${R - 4},80 C${R + 3},76 ${R + 4},62 ${R + 1},44 Z`, hair);
+  if (av.hair === 'bob' || av.hair === 'bobc') g += P(`M${L - 1},44 C${L - 4},62 ${L - 3},76 ${L + 4},80 L${R - 4},80 C${R + 3},76 ${R + 4},62 ${R + 1},44 Z`, hair);
   if (av.hair === 'long') g += P(`M${L - 1},44 C${L - 5},80 ${L - 2},100 ${L + 6},104 L${R - 6},104 C${R + 2},100 ${R + 5},80 ${R + 1},44 Z`, hair);
   if (av.hair === 'bun') g += `<circle cx="${cx}" cy="15" r="10" fill="${hair}" stroke="${INK}" stroke-width="${sw}"/>`;
   if (av.hair === 'curly') g += P(curlyCloud(cx, 44, hw + 9, 34, 160, 380, 13), hair);
@@ -59,7 +65,7 @@ function avatarSVG(av, f, opt = {}) {
     g += `<rect x="${(cx - hp - 0.5).toFixed(1)}" y="${yH - 5}" width="${(2 * hp + 1).toFixed(1)}" height="${yC - yH + 9}" rx="4" fill="${bot}" stroke="${INK}" stroke-width="${sw}"/>`;
     if (av.outfit === 'raglan') legs.forEach(l => { const x = l[0] < cx ? l[0] - (lw + 3) / 2 + 1.5 : l[0] + (lw + 3) / 2 - 1.5; g += ln(x, yC - 4, x, yC + 10, 1.6, trim); });
   }
-  legs.forEach(l => { const s = l[0] < cx ? -1 : 1; const w = lw / 2 + 4; const x = l[0] + s * 1.5;
+  legs.forEach(l => { const s = l[0] < cx ? -1 : 1; const w = lw / 2 + 5; const x = l[0] + s * 1.5;
     g += P(`M${(x - w).toFixed(1)},${yA + 6} C${(x - w).toFixed(1)},${yA - 2} ${(x + w).toFixed(1)},${yA - 2} ${(x + w).toFixed(1)},${yA + 6} Z`, '#fbfaf6');
     g += ln(x - w + 1.5, yA + 4.5, x + w - 1.5, yA + 4.5, 1, '#c9c2b4'); });
 
@@ -127,10 +133,16 @@ function avatarSVG(av, f, opt = {}) {
   else g += brow(ex[0], 0) + brow(ex[1], 0) + openEye(ex[0]) + openEye(ex[1]) + smileM;
 
   /* 前髮 */
-  if (av.hair === 'bob' || av.hair === 'long') {
-    g += P(`M${L - 1},56 C${L - 4},30 ${L + 10},16 ${cx},16 C${R - 10},16 ${R + 4},30 ${R + 1},56 C${R - 1},50 ${R - 3},44 ${R - 6},40 C${R - 14},38 ${cx + 6},34 ${cx - 2},26 C${cx - 8},34 ${L + 12},39 ${L + 3},42 C${L + 1},46 ${L},51 ${L - 1},56 Z`, hair);
-    g += P(`M${L},44 C${L - 2},58 ${L - 1},70 ${L + 3},78 L${L + 8},77 C${L + 5},68 ${L + 4},56 ${L + 5},44 Z`, hair) + P(`M${R},44 C${R + 2},58 ${R + 1},70 ${R - 3},78 L${R - 8},77 C${R - 5},68 ${R - 4},56 ${R - 5},44 Z`, hair);
-    g += `<path d="M${cx - 2},26 C${cx - 4},22 ${cx - 7},20 ${cx - 11},19" fill="none" stroke="${INK}" stroke-width="1" opacity=".55"/><path d="M${R - 12},30 C${R - 8},34 ${R - 5},40 ${R - 4},48" fill="none" stroke="${INK}" stroke-width="1" opacity=".45"/>`;
+  if (av.hair === 'bob' || av.hair === 'bobc' || av.hair === 'long') {
+    const locks = P(`M${L},44 C${L - 2},58 ${L - 1},70 ${L + 3},78 L${L + 8},77 C${L + 5},68 ${L + 4},56 ${L + 5},44 Z`, hair) + P(`M${R},44 C${R + 2},58 ${R + 1},70 ${R - 3},78 L${R - 8},77 C${R - 5},68 ${R - 4},56 ${R - 5},44 Z`, hair);
+    if (av.hair === 'bobc') {
+      g += P(`M${L - 1},56 C${L - 4},30 ${L + 10},16 ${cx},16 C${R - 10},16 ${R + 4},30 ${R + 1},56 C${R - 1},50 ${R - 3},44 ${R - 6},40 C${R - 14},38 ${cx + 6},34 ${cx - 2},26 C${cx - 8},34 ${L + 12},39 ${L + 3},42 C${L + 1},46 ${L},51 ${L - 1},56 Z`, hair) + locks;
+      g += `<path d="M${cx - 2},26 C${cx - 4},22 ${cx - 7},20 ${cx - 11},19" fill="none" stroke="${INK}" stroke-width="1" opacity=".55"/>`;
+    } else {
+      const px = cx - 11; // 側分：分線在左，瀏海往右撥
+      g += P(`M${L - 1},56 C${L - 4},30 ${L + 6},17 ${px},17 C${cx + 14},15 ${R + 4},28 ${R + 1},56 C${R - 1},49 ${R - 3},43 ${R - 6},39 C${R - 18},38 ${cx - 2},32 ${px + 1},22 C${px - 6},30 ${L + 8},36 ${L + 3},42 C${L + 1},46 ${L},51 ${L - 1},56 Z`, hair) + locks;
+      g += `<path d="M${px + 2},20 C${cx + 6},22 ${R - 10},28 ${R - 6},36" fill="none" stroke="${INK}" stroke-width="1" opacity=".5"/><path d="M${px + 4},25 C${cx + 4},28 ${R - 14},31 ${R - 11},37" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>`;
+    }
   } else if (av.hair === 'curly') {
     g += P(curlyFringe(cx, L, R), hair);
     g += `<path d="M${cx - 2},17 C${cx - 6},8 ${cx + 5},5 ${cx + 3},13" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`;
@@ -264,4 +276,58 @@ function macroRow(label, val, target, color, unit = 'g', kind = 'cap') {
     ? (rem > 0 ? `<span class="gap">差 ${r0(rem)}${unit}</span>` : `<span class="gap ok">已達標</span>`)
     : (rem >= 0 ? `<span class="gap">剩 ${r0(rem)}${unit}</span>` : `<span class="gap over">超出 ${r0(-rem)}${unit}</span>`);
   return `<div class="mac"><div class="lab"><span><b>${label}</b> ${r0(val).toLocaleString()} / ${r0(target).toLocaleString()}${unit}</span>${gap}</div><div class="bar"><i style="width:${pct}%;background:${color}"></i></div></div>`;
+}
+
+/* ---------- 定稿角色（向量化資產） ----------
+   圖層順序：身體［身形×服裝］→ 背號 → 頭（髮、臉）→ 腮紅 → 五官［表情］。
+   頭部與五官所有組合共用同一座標，換身形或衣服時頭不會移動。
+   沒有資產的角色（目前 B）或使用者關閉時，退回舊版程式繪製人物。 */
+const V2_OUTFIT = { stripe: 'casual', hoodie: 'hoodie', sport: 'active_crop', shirt: 'shirt', raglan: 'active_tee' };
+const V2_OUTFIT_NAMES = { stripe: '條紋T＋長褲', hoodie: '帽T＋長褲', sport: '運動背心＋緊身褲', shirt: '襯衫＋長褲', raglan: '運動T＋短褲', jersey: '中信兄弟球衣' };
+const V2_ROLE_NAMES = { top: '上衣', stripe: '條紋', bottom: '褲子' };
+function v2Recolor(uid, oid) { const A = CHAR_ASSETS[uid]; return (A && A.recolor && A.recolor[oid]) || []; }
+const CHAR_CACHE = {}, CHAR_LOADING = {};
+function v2On(uid, av) { return typeof CHAR_ASSETS !== 'undefined' && !!CHAR_ASSETS[uid] && av.charV2 !== false; }
+function v2OutfitId(av) { return av.outfit === 'jersey' ? 'brothers_' + (av.jersey === 'navy' ? 'navy' : 'yellow') : (V2_OUTFIT[av.outfit] || 'casual'); }
+function charOutfit(uid, oid) {
+  const k = uid + '/' + oid; if (CHAR_CACHE[k]) return CHAR_CACHE[k];
+  if (!CHAR_LOADING[k]) {
+    CHAR_LOADING[k] = fetch(`assets/${uid}/${oid}.json?v=${APP_VERSION}`).then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(j => { CHAR_CACHE[k] = j; if (typeof safeRender === 'function') safeRender(); if (UI.tab === 'set' && typeof refreshPreview === 'function') refreshPreview(); })
+      .catch(() => { CHAR_LOADING[k] = null; });
+  }
+  return null;
+}
+function charSVG(uid, av, stage, opt = {}) {
+  const A = CHAR_ASSETS[uid]; const oid = v2OutfitId(av); const O = charOutfit(uid, oid);
+  const id = 'cv' + (++_svgSeq);
+  const L = (d, fill) => d ? `<path d="${d}" fill="${fill}" fill-rule="evenodd"/>` : '';
+  const oc = (av.oc && av.oc[oid]) || {};
+  const skin = av.skin || A.colors.skin, hair = av.hairColor || A.colors.hair;
+  let g = '';
+  if (O) {
+    const st = O.stages[stage] || O.stages.neutral;
+    O.order.forEach(n => { g += L(st[n], n === 'skin' ? skin : (oc[n] || O.colors[n] || '#ccc')); });
+    g += L(st.ink, CHAR_INK);
+    if (st.num && av.no !== '' && av.no != null) {
+      const [x, y, fs] = st.num; const t = esc(String(av.no).replace(/\D/g, '').slice(0, 2));
+      if (t) g += `<text x="${x}" y="${y}" font-size="${t.length > 1 ? fs : fs * 1.1}" font-weight="800" font-family="Arial Black,Arial,Helvetica,sans-serif" text-anchor="middle" fill="${O.colors.trim || '#142343'}" stroke="${O.colors.trim || '#142343'}" stroke-width="0.6">${t}</text>`;
+    }
+  }
+  g += L(A.head.hair, hair) + L(A.head.skin, skin);
+  (A.blush || []).forEach(b => { g += `<ellipse cx="${b[0]}" cy="${b[1]}" rx="${b[2] * 1.15}" ry="${b[3] * 1.15}" fill="url(#${id}b)"/>`; });
+  g += L(A.head.ink, CHAR_INK);
+  const E = A.expr[normExpr(opt.expr)] || A.expr.calm;
+  if (typeof E === 'string') g += L(E, CHAR_INK);
+  else {
+    g += `<clipPath id="${id}c"><path d="${A.head.skin}"/></clipPath><g clip-path="url(#${id}c)">`;
+    (E.parts || []).forEach(([d, c]) => { g += L(d, c); });
+    g += L(E.ink, CHAR_INK) + '</g>';
+    g += L(E.fxWhite, '#ffffff') + L(E.fxYellow, '#f7c531') + L(E.fxBlue, '#3f8fc4') + L(E.fxInk, CHAR_INK);
+  }
+  return `<svg class="av av2" viewBox="0 0 ${A.w} ${A.h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="人物"><defs><radialGradient id="${id}b"><stop offset="0" stop-color="#f6a68c" stop-opacity=".55"/><stop offset="1" stop-color="#f6a68c" stop-opacity="0"/></radialGradient></defs>${g}</svg>`;
+}
+function renderAvatar(uid, av, f, opt = {}) {
+  if (!v2On(uid, av)) return avatarSVG(av, f, opt);
+  return charSVG(uid, av, opt.stage || (typeof bodyStage === 'function' && hasProfile(uid) ? bodyStage(uid) : 'neutral'), opt);
 }

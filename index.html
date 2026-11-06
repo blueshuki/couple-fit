@@ -46,7 +46,7 @@ nav.tabs button.on:before{content:"";position:absolute;top:0;left:30%;right:30%;
 .card h2:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--gold);display:inline-block}
 .card.flat h2:before{display:none}
 .muted{color:var(--muted)}.small{font-size:12.5px}.tiny{font-size:11px}
-.row{display:flex;align-items:center;gap:8px}.row.wrap{flex-wrap:wrap}.grow{flex:1;min-width:0}
+.row{display:flex;align-items:center;gap:8px}.rwrap{flex-wrap:wrap}.grow{flex:1;min-width:0}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .btn{border:1px solid var(--line);background:#fff;border-radius:12px;padding:9px 12px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--ink)}
@@ -78,6 +78,8 @@ label.f{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 .pcard.b.sel{border-color:var(--B);background:rgba(224,168,0,.05)}
 .pcard .nm{font-weight:800;font-size:15px}
 .pcard svg.av{width:100%;max-width:140px;height:auto;display:block;margin:0 auto}
+.pcard svg.av2{width:auto;max-width:100%;height:230px}
+.avprev svg.av2{width:auto;height:280px}
 .pcard .stat{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:2px}
 .pcard .stat .t{font-size:12px;line-height:1.35;text-align:left}
 .me-tag{position:absolute;top:6px;left:8px;font-size:10px;background:var(--navy);color:#fff;padding:1px 7px;border-radius:9px}
@@ -189,9 +191,10 @@ ol.steps{padding-left:20px;margin:6px 0}ol.steps li{margin:5px 0;font-size:13.5p
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div class="sheet hidden" id="sheet"><div class="sheet-bg" data-act="closeSheet"></div><div class="sheet-body" id="sheetBody"></div></div>
 <div id="restBox"></div>
-<script src="js/data.js?v=2.0.1"></script>
-<script src="js/art.js?v=2.0.1"></script>
-<script src="js/views.js?v=2.0.1"></script>
-<script src="js/app.js?v=2.0.1"></script>
+<script src="js/data.js?v=2.4.0"></script>
+<script src="js/art.js?v=2.4.0"></script>
+<script src="js/chars.js?v=2.4.0"></script>
+<script src="js/views.js?v=2.4.0"></script>
+<script src="js/app.js?v=2.4.0"></script>
 </body>
 </html>

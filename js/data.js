@@ -2,7 +2,7 @@
 /* =========================================================
    兩人減脂 v2 — 資料、計算、解讀邏輯
    ========================================================= */
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.4.0';
 const LS_KEY = 'c17_state_v1';
 
 /* ---------- 工具 ---------- */
@@ -66,8 +66,8 @@ function recs(type, uid, date) {
 const UIDS = ['A', 'B'];
 const otherUid = u => u === 'A' ? 'B' : 'A';
 const DEF_AVATAR = {
-  A: { outfit: 'stripe', top: '#ffffff', bottom: '#3d4352', trim: '#5b7aa6', hair: 'bob', hairColor: '#6b4a32', skin: '#f9dcc6', expr: 'auto', no: '' },
-  B: { outfit: 'jersey', top: '#ffd23f', bottom: '#f7f4ec', trim: '#1f2d4d', hair: 'curly', hairColor: '#6b4a32', skin: '#f9dcc6', expr: 'auto', no: '' },
+  A: { outfit: 'stripe', top: '#fcf5e9', bottom: '#424247', trim: '#727b80', hair: 'bob', hairColor: '#54453c', skin: '#fed9b2', expr: 'auto', no: '', jersey: 'yellow' },
+  B: { outfit: 'jersey', top: '#ffd23f', bottom: '#f7f4ec', trim: '#1f2d4d', hair: 'curly', hairColor: '#5f4436', skin: '#fed4b2', expr: 'auto', no: '', jersey: 'yellow' },
 };
 function defProfile(uid) {
   return {
@@ -131,8 +131,10 @@ const TPL = {
   L2: { name: '下肢 2', ex: [['臀推', 3, '8-12'], ['保加利亞分腿蹲', 3, '8-12'], ['腿伸展', 2, '12-15'], ['腿彎舉', 2, '12-15'], ['髖外展機', 2, '12-15'], ['懸吊抬腿', 3, '10-12']] },
 };
 const ROTATION = { 1: ['A'], 2: ['A', 'B'], 3: ['A', 'B'], 4: ['U1', 'L1', 'U2', 'L2'], 5: ['U1', 'L1', 'U2', 'L2'], 6: ['U1', 'L1', 'U2', 'L2'] };
+function customTpls() { return recs('tpl').map(r => ({ key: r.id, name: r.data.name, ex: r.data.ex || [], uid: r.uid })).sort((a, b) => a.name.localeCompare(b.name)); }
+function getTpl(k) { if (!k) return null; if (TPL[k]) return TPL[k]; const r = S.records[k]; return r && !r.deleted && r.type === 'tpl' ? { name: r.data.name, ex: r.data.ex || [] } : null; }
 function tplRange(tplKey, exName) {
-  const t = TPL[tplKey]; const e = t && t.ex.find(x => x[0] === exName);
+  const t = getTpl(tplKey); const e = t && t.ex.find(x => x[0] === exName);
   const m = (e ? e[2] : '8-12').split('-').map(Number); return [m[0] || 8, m[1] || m[0] || 12];
 }
 const CARDIO = { treadmill: '跑步機', bike: '飛輪/腳踏車', elliptical: '橢圓機', stair: '爬梯機', walk: '戶外快走', run: '戶外跑步', swim: '游泳', other: '其他' };
@@ -219,6 +221,14 @@ function progressPct(uid) {
   if (Math.abs(s - g) < 0.1) return 100;
   return clamp((s - w) / (s - g) * 100, 0, 100);
 }
+// 定稿人物身形：依「目標進度」決定，不用 BMI 絕對值（不評價體型）
+function bodyStage(uid) {
+  const p = profile(uid); const s = num(p.startWeight), g = num(p.goalWeight), w = trendWeight(uid);
+  if (g < s) { if (w >= s * 1.04) return 'round'; if (w >= s * 1.02) return 'soft'; }
+  const pct = progressPct(uid);
+  return pct >= 100 ? 'lean_toned' : pct >= 50 ? 'fit' : 'neutral';
+}
+const STAGE_NAMES = { lean_toned: '結實', fit: '勻稱', neutral: '起點', soft: '豐潤', round: '圓潤' };
 function baseName(pct) { return pct >= 100 ? '回本壘得分' : pct >= 75 ? '三壘' : pct >= 50 ? '二壘' : pct >= 25 ? '一壘' : '打擊區'; }
 function eta(uid) {
   const p = profile(uid); const w = trendWeight(uid); const g = num(p.goalWeight); const diff = w - g;
@@ -484,11 +494,11 @@ function coupleWeek() {
 
 /* ---------- 人物表情 ---------- */
 function exprFor(uid) {
-  const p = profile(uid); if (p.avatar.expr && p.avatar.expr !== 'auto') return p.avatar.expr;
+  const p = profile(uid); if (p.avatar.expr && p.avatar.expr !== 'auto') return normExpr(p.avatar.expr);
   const t = todayStr(); const dd = daily(uid, t);
   if (dd.sleep === 'bad') return 'sleepy';
   const st = sessionStats(uid, t); if (trained(st)) return 'proud';
   const s = dayFood(uid, t); const tg = targets(uid);
-  if (s.n && s.p >= tg.p * 0.9 && s.kcal <= tg.kcal * 1.05) return 'happy';
-  return 'smile';
+  if (s.n && s.p >= tg.p * 0.9 && s.kcal <= tg.kcal * 1.05) return 'laugh';
+  return 'calm';
 }
