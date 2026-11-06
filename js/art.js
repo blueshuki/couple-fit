@@ -233,6 +233,7 @@ function diamondSVG(pct, col = '#1f2d4d', size = 54) {
    <circle cx="${cur[0].toFixed(1)}" cy="${cur[1].toFixed(1)}" r="4" fill="${col}" stroke="#fff" stroke-width="1.5"/></svg>`;
 }
 const ICONS = {
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
   home: '<svg viewBox="0 0 24 24"><path d="M5 4h14v9l-7 7-7-7z"/></svg>',
   food: '<svg viewBox="0 0 24 24"><path d="M3 12h18a9 9 0 0 1-18 0z"/><path d="M14 3l-3 7M18 4l-4 6"/></svg>',
   gym: '<svg viewBox="0 0 24 24"><path d="M4 20l3-3M6.5 17.5L19 5a1.6 1.6 0 0 0-2.3-2.3L4.5 15.2z"/><circle cx="18" cy="18" r="2.6"/></svg>',

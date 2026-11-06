@@ -1,6 +1,6 @@
-# 兩人減脂 v2.0 — 部署教學
+# 減脂 \Fight/ v2.4 — 部署教學
 
-全部免費：GitHub Pages（網頁）＋ Google 試算表 / Apps Script（資料、同步、AI 代理、照片）＋ Gemini 免費額度（AI）＋ LINE 官方帳號輕用量（提醒，選用）。
+全部免費：GitHub Pages（網頁）＋ Google 試算表 / Apps Script（資料、同步、AI 代理、照片）＋ Gemini 免費額度（AI）。
 
 ```
 上傳到 GitHub 的檔案（保持資料夾結構）：
@@ -9,8 +9,11 @@ icon.svg
 icon-180.png
 js/data.js
 js/art.js
+js/chars.js
 js/views.js
 js/app.js
+assets/A/（整個資料夾）
+assets/B/（整個資料夾）
 
 貼到 Apps Script 的檔案（不要上傳到 GitHub）：
 Code.gs
@@ -20,7 +23,7 @@ Code.gs
 
 ## 1. Google 試算表與後端（約 10 分鐘）
 
-1. 建立新的 Google 試算表，命名「兩人減脂資料」→ 選單「擴充功能 → Apps Script」。
+1. 建立新的 Google 試算表，命名「減脂 Fight 資料」→ 選單「擴充功能 → Apps Script」。
 2. 刪掉預設內容，貼上 `Code.gs` → 儲存。
 3. 左側齒輪「專案設定」：
    - **時區**改成「(GMT+08:00) 台北」
@@ -30,7 +33,6 @@ Code.gs
    |---|---|
    | `APP_TOKEN` | 自訂通關密語，16 碼以上英數混合 |
    | `GEMINI_API_KEY` | 第 2 步取得 |
-   | `LINE_TOKEN` | 第 6 步取得（選用，可以之後再加） |
 
 4. 函式選 `setup` →「執行」→ 授權。畫面會出現「Google 尚未驗證這個應用程式」，點「進階 → 前往（不安全）」，因為這是你自己的程式。這次會要求試算表、雲端硬碟（存體態照片）、外部連線三種權限。
 5. 「部署 → 新增部署作業」→ 類型「網頁應用程式」→ 執行身分「**我**」→ 誰可以存取「**所有人**」→ 部署 → 複製結尾是 `/exec` 的網址。
@@ -64,16 +66,14 @@ App 裡「設定 → 體重機自動同步 → 看設定步驟」有完整步驟
 - 自動化：「App → bpt care → 已關閉 → 立即執行」，建議再加一個每天 10:00 的保險。
 - 完整身體組成（肌肉量、內臟脂肪等）偶爾在 App 用「上傳 bpt care 報告」截圖就好。
 
-## 6. LINE 提醒（選用，約 10 分鐘）
+## 6. 通知
 
-App 裡「設定 → LINE 提醒 → 看設定步驟」。摘要：
-1. LINE Developers 建立 Messaging API channel → 發行 Channel access token → 貼到 `LINE_TOKEN`。
-2. Webhook URL 填 Apps Script 的 `/exec` 網址，打開 Use webhook（按 Verify 顯示錯誤可以忽略）。
-3. 在 LINE Official Account Manager 關掉「自動回應訊息」。
-4. 兩人加官方帳號好友，各自傳：`綁定 A 通關密語`、`綁定 B 通關密語`。
-5. Apps Script 執行一次 `installTriggers`。
+不需要額外設定。右上角的鈴鐺會集中顯示：
+- 今天還沒量體重、晚上 8 點後飲食記錄少於 2 筆、完整體組成報告超過 30 天沒更新
+- 對方送的應援、對方完成訓練、週回顧與月報出爐
+- 經期快到了、雲端同步失敗
 
-之後會在三種時候收到 LINE：每天 9:30 還沒量體重、21:00 飲食記錄少於 2 筆、週日 20:00 的週回顧，以及對方送你應援時。免費方案每月 200 則推播，兩人通常一個月用不到一半。
+「設定 → 個人資料 → App 內提醒」可以關掉待辦類提醒。
 
 ## 從 v1 升級
 

@@ -119,7 +119,7 @@ function viewWelcome() {
   return `<div class="card center" style="margin-top:20px">
     <div class="row" style="justify-content:center;gap:0">${renderAvatar('A', profile('A').avatar, 0.3).replace('class="av', 'style="width:110px;max-height:240px" class="av')}${renderAvatar('B', profile('B').avatar, 0.3, { expr: 'laugh' }).replace('class="av', 'style="width:110px;max-height:240px" class="av')}</div>
     <div class="row" style="justify-content:center;gap:4px">${catSVG('orange', 'loaf', 40)}${catSVG('tabby', 'loaf', 40)}</div>
-    <h2 style="justify-content:center;font-size:18px">兩人減脂</h2>
+    <h2 style="justify-content:center;font-size:18px">減脂 \\Fight/</h2>
     <p class="muted small">每個人用自己的手機選自己的身分。<br>資料會透過你們的 Google 試算表同步。</p>
     <p><b>這支手機是誰在用？</b></p>
     <div class="grid2"><button class="btn pri" data-act="iam" data-uid="A">我是 ${esc(nameOf('A'))}</button><button class="btn gold" data-act="iam" data-uid="B">我是 ${esc(nameOf('B'))}</button></div>
@@ -519,7 +519,7 @@ function viewSet() {
     <label class="f">每週想減多少</label><select data-pf="pace">${paceOpts.map(o => `<option value="${o[0]}" ${num(p.pace) === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
     <label class="f">每週重訓次數</label><select data-pf="trainDays">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${num(p.trainDays) === n ? 'selected' : ''}>${n} 次</option>`).join('')}</select>
     ${p.sex === 'F' ? `<div class="grid2"><div><label class="f">平常週期天數</label><input type="number" data-pf="cycleLen" value="${p.cycleLen}"></div><div><label class="f">經期天數</label><input type="number" data-pf="periodLen" value="${p.periodLen}"></div></div><div class="tiny muted mt8">記錄 2 次以上經期後，會改用實際平均週期。</div>` : ''}
-    <label class="row small mt12"><input type="checkbox" data-pf="remind" ${p.remind !== false ? 'checked' : ''}> LINE 提醒（需另外設定 LINE，見下方）</label>
+    <label class="row small mt12"><input type="checkbox" data-pf="remind" ${p.remind !== false ? 'checked' : ''}> App 內提醒（還沒量體重、飲食記錄太少、體組成報告該更新時，鈴鐺會亮）</label>
     ${appearanceHTML(eu, p, av)}
     <button class="btn pri block mt12" data-act="saveProfile">儲存個人資料</button></div>`;
   h += `<div class="card"><h2>雲端同步（Google Apps Script）</h2>
@@ -530,11 +530,6 @@ function viewSet() {
   h += `<div class="card"><h2>${icon('scale')} 體重機自動同步</h2>
     <div class="small">bpt care → Apple 健康 → iPhone「捷徑」自動化 → 這裡。量完體重、關掉 bpt care，就會自動送過來。</div>
     <button class="btn block mt8" data-act="guideShortcut">看設定步驟（約 5 分鐘）</button></div>`;
-  const ln = S.line;
-  h += `<div class="card"><h2>LINE 提醒</h2>
-    <div class="small">${ln ? (ln.token ? `已設定 LINE。綁定狀態：${UIDS.map(u => `${esc(nameOf(u))} ${ln[u] ? '✓' : '未綁定'}`).join('、')}` : '後端尚未設定 LINE。') : '按「測試連線」後會顯示狀態。'}</div>
-    <div class="tiny muted mt8">早上還沒量體重、晚上記錄太少時提醒；週日晚上傳週回顧；收到應援時通知。</div>
-    <button class="btn block mt8" data-act="guideLine">看設定步驟</button></div>`;
   h += `<div class="card"><h2>備份</h2><div class="grid2"><button class="btn" data-act="exportJson">匯出備份檔</button><button class="btn" data-act="importJson">匯入備份檔</button></div>
     <input type="file" id="impFile" accept="application/json,.json" style="display:none">
     <div class="tiny muted mt8">雲端本身就是一份備份（Google 試算表）；這裡是額外的保險。</div></div>
@@ -601,17 +596,14 @@ function sheetShortcutGuide() {
     <li>再加一個保險：「<b>特定時間</b>」每天 10:00 →「立即執行」→「同步體重」。</li></ol>
     <div class="note mt8">另一半在<b>自己的手機</b>做一樣的設定，uid 填 <b>${otherUid(u)}</b>。等 bpt care 顯示完數字再離開；同一天以最後一次為準。肌肉量等完整數據偶爾用「上傳 bpt care 報告」補上。</div>`);
 }
-function sheetLineGuide() {
-  openSheet(`<h3>LINE 提醒設定<button class="btn sm ghost x" data-act="closeSheet">關閉</button></h3>
-    <ol class="steps">
-      <li>電腦開 <b>developers.line.biz/console</b>，用 LINE 登入 →「Create a new provider」，名稱「兩人減脂」。</li>
-      <li>在 Provider 頁按「<b>Create a Messaging API channel</b>」→ 依指示建立 LINE 官方帳號（名稱例如「兩人減脂小幫手」）。</li>
-      <li>進入 LINE Official Account Manager → 右上「設定」→ 左側「<b>Messaging API</b>」→「啟用 Messaging API」→ 選剛剛的 Provider；同頁 <b>Webhook 網址</b>貼上 Apps Script 的 /exec 網址 → 儲存。</li>
-      <li>「設定 → <b>回應設定</b>」：Webhook 打開、<b>自動回應訊息關閉</b>。</li>
-      <li>回 LINE Developers → 點這個 channel →「Messaging API」分頁最下方「Channel access token (long-lived)」→ Issue → 複製。確認「Use webhook」是開的（Verify 顯示錯誤可以忽略）。</li>
-      <li>Apps Script 指令碼屬性新增 <b>LINE_TOKEN</b> = 剛剛的 token。</li>
-      <li>兩人用 LINE 掃同一頁的 QR code 加好友，各自傳：<div class="code">綁定 A 通關密語</div>（另一半傳「綁定 B 通關密語」），收到「已綁定」就完成。</li>
-      <li>Apps Script 執行一次 <b>installTriggers</b>。</li>
-    </ol>
-    <div class="note">免費方案每月 200 則推播，提醒只在「該做的事還沒做」時才發。</div>`);
+
+/* ---------- 通知中心 ---------- */
+function sheetNotif() {
+  const list = notifications(); const seen = S.cfg.seen || {};
+  const item = n => `<div class="nt ${n.kind}" data-act="notifGo" data-id="${esc(n.id)}"><div class="ni">${icon(n.ic)}</div><div class="nb"><b>${esc(n.title)}</b><div>${esc(n.body)}</div></div>${!seen[n.id] ? '<span class="new"></span>' : ''}</div>`;
+  const grp = (title, arr) => arr.length ? `<div class="ng">${title}</div>${arr.map(item).join('')}` : '';
+  const todo = list.filter(n => n.kind === 'todo'), info = list.filter(n => n.kind === 'info'), msg = list.filter(n => n.kind === 'msg');
+  openSheet(`<h3>${icon('bell')} 通知<button class="btn sm ghost x" data-act="closeSheet">關閉</button></h3>
+    ${list.length ? grp('今天待辦', todo) + grp('提醒', info) + grp('動態與應援', msg) : `<div class="row" style="justify-content:center;padding:18px 0;gap:6px">${catSVG('orange', 'sit', 34)}<div class="small muted">目前沒有新通知，今天的事都做完了。</div></div>`}
+    <div class="tiny muted mt12">待辦做完會自動消失；應援和動態保留 7 天。</div>`);
 }

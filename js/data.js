@@ -2,7 +2,7 @@
 /* =========================================================
    兩人減脂 v2 — 資料、計算、解讀邏輯
    ========================================================= */
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.4.1';
 const LS_KEY = 'c17_state_v1';
 
 /* ---------- 工具 ---------- */
@@ -36,7 +36,7 @@ const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 function rangeDays(from, to) { const out = []; for (let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; }
 
 /* ---------- 狀態 ---------- */
-function defaultState() { return { cfg: { apiUrl: '', token: '', me: '', readCheers: [] }, records: {}, pending: [], lastTs: 0, lastSyncAt: 0, syncErr: '', line: null }; }
+function defaultState() { return { cfg: { apiUrl: '', token: '', me: '', readCheers: [], seen: {} }, records: {}, pending: [], lastTs: 0, lastSyncAt: 0, syncErr: '' }; }
 function loadState() {
   try {
     const j = JSON.parse(localStorage.getItem(LS_KEY));
@@ -490,6 +490,56 @@ function monthReport(uid, ym) {
 function coupleWeek() {
   const a = weekStats('A'), b = weekStats('B');
   return { pHits: a.pDays + b.pDays, pGoal: 10, train: a.train + b.train, trainGoal: a.plan + b.plan };
+}
+
+/* ---------- 通知中心（全部在 App 內，不靠 LINE） ----------
+   kind：msg＝對方的應援、對方動態、週回顧等（看過就算已讀）
+         todo＝今天還沒做的事（做完就自動消失）
+         info＝狀態提醒（同步、經期）                                   */
+function lastBodyScan(uid) {
+  let last = '';
+  Object.values(S.records).forEach(r => { if (r.type === 'daily' && r.uid === uid && !r.deleted && r.data && num(r.data.bf) > 0 && r.date > last) last = r.date; });
+  return last;
+}
+function notifications(uid = me()) {
+  const out = []; if (!uid || !hasProfile(uid)) return out;
+  const t = todayStr(), now = new Date(), hr = now.getHours(), o = otherUid(uid), oName = nameOf(o), p = profile(uid);
+  const add = (id, kind, ic, title, body, act, v, sort) => out.push({ id, kind, ic, title, body, act, v, sort: sort || 0 });
+  // 1. 對方的應援（7 天內）
+  recs('cheer').filter(r => r.data.to === uid && r.date >= addDays(t, -6)).forEach(r =>
+    add('cheer:' + r.id, 'msg', 'cheer', `${nameOf(r.uid)} 給你應援`, r.data.msg, 'tab', 'home', r.updatedAt || 0));
+  // 2. 對方今天／昨天完成訓練
+  if (hasProfile(o)) [t, addDays(t, -1)].forEach((d, i) => {
+    if (trained(sessionStats(o, d))) add('ptrain:' + d, 'msg', 'gym', `${oName}${i ? '昨天' : '今天'}完成訓練`, '給個應援吧。', 'cheer', '', dayNum(d) * 1e5);
+  });
+  // 3. 週回顧（週日晚上～週一）、月報（每月 1～3 日）
+  const wd = now.getDay();
+  if ((wd === 0 && hr >= 18) || wd === 1) { const end = wd === 0 ? t : addDays(t, -1); add('week:' + end, 'msg', 'home', '本週回顧出爐了', '到總覽看「下週只做一件事」。', 'tab', 'home', dayNum(end) * 1e5 + 1); }
+  if (now.getDate() <= 3) { const ym = addDays(t, -now.getDate()).slice(0, 7); add('month:' + ym, 'msg', 'body', `${+ym.slice(5)} 月的月報出爐了`, '到「身體」看這個月的變化。', 'tab', 'body', dayNum(t) * 1e5); }
+  // 4. 今天還沒做的事（個人資料可關閉）
+  if (p.remind !== false) {
+    if (hr >= 5 && !(num(daily(uid, t).weight) > 0)) add('w:' + t, 'todo', 'scale', '今天還沒量體重', '起床、上完廁所後量一次；量完關掉 bpt care 就會自動同步。', 'tab', 'home');
+    const nf = recs('food', uid, t).length;
+    if (hr >= 20 && nf < 2) add('food:' + t, 'todo', 'food', nf ? '今天的飲食只記了 1 筆' : '今天還沒有飲食記錄', '睡前補一下，明天的體重解讀才會準。', 'tab', 'food');
+    const ls = lastBodyScan(uid);
+    if (!ls || dayNum(t) - dayNum(ls) >= 30) add('scan:' + t.slice(0, 7), 'todo', 'body', ls ? `完整體組成報告已經 ${dayNum(t) - dayNum(ls)} 天沒更新` : '還沒有完整體組成報告', '一個月傳一次 bpt care 的完整報告截圖就夠了。', 'tab', 'body');
+  }
+  // 5. 經期快到了（兩人都看得到）
+  UIDS.forEach(u => {
+    if (!hasProfile(u) || profile(u).sex !== 'F') return; const c = cyclePhase(u); if (!c || c.inPeriod) return;
+    if (c.toNext >= 0 && c.toNext <= 3) add('cyc:' + u + ':' + c.next, 'info', 'drop', `${u === uid ? '你' : nameOf(u)}的經期預計${c.toNext ? ' ' + c.toNext + ' 天後' : '今天'}開始`, '這幾天體重偏高多半是水分，不用緊張。', 'tab', 'body');
+  });
+  // 6. 同步狀態
+  if (S.cfg.apiUrl && S.syncErr) add('sync:' + t, 'info', 'set', '雲端同步失敗', String(S.syncErr).slice(0, 80) + '。點這裡重試。', 'syncNow', '');
+  else if (S.cfg.apiUrl && S.pending.length && Date.now() - (S.lastSyncAt || 0) > 6 * 3600e3) add('pend:' + t, 'info', 'set', `有 ${S.pending.length} 筆資料還沒上傳`, '點這裡立即同步。', 'syncNow', '');
+  const rank = { todo: 0, info: 1, msg: 2 };
+  return out.sort((a, b) => rank[a.kind] - rank[b.kind] || b.sort - a.sort);
+}
+function unseenCount(uid = me()) { const seen = S.cfg.seen || {}; return notifications(uid).filter(n => !seen[n.id]).length; }
+function markNotifSeen(uid = me()) {
+  const seen = S.cfg.seen || (S.cfg.seen = {}); const now = Date.now();
+  notifications(uid).forEach(n => { if (!seen[n.id]) seen[n.id] = now; });
+  Object.keys(seen).forEach(k => { if (now - seen[k] > 40 * 864e5) delete seen[k]; });  // 只留 40 天
 }
 
 /* ---------- 人物表情 ---------- */

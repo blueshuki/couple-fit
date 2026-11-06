@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="兩人減脂">
-<title>兩人減脂</title>
+<meta name="apple-mobile-web-app-title" content="減脂 \Fight/">
+<title>減脂 \Fight/</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
@@ -30,6 +30,19 @@ header.top h1{font-size:17px;margin:0;font-weight:800;flex:1;white-space:nowrap;
 header.top h1 .amp{color:var(--gold)}
 header.top .stitch{height:6px;background:var(--gold);position:relative}
 header.top .stitch:after{content:"";position:absolute;left:0;right:0;top:2px;height:2px;background:repeating-linear-gradient(90deg,var(--red) 0 5px,transparent 5px 11px);opacity:.7}
+.bell{position:relative;background:rgba(255,255,255,.08);border:0;color:#fff;width:34px;height:30px;border-radius:99px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.bell .ic{width:19px;height:19px}
+.bell .badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;border-radius:9px;background:var(--red);color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;padding:0 4px;box-shadow:0 0 0 2px var(--navy)}
+.nt{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.nt:first-of-type{border-top:0}
+.nt .ni{width:32px;height:32px;border-radius:10px;background:var(--soft);display:flex;align-items:center;justify-content:center;flex:none;color:var(--navy)}
+.nt.todo .ni{background:#fff4d6;color:#a06a00}
+.nt.info .ni{background:#fbeef0;color:#9a4458}
+.nt .nb{flex:1;min-width:0}
+.nt .nb b{font-size:14px;display:block}
+.nt .nb div{font-size:12.5px;color:var(--muted)}
+.nt .new{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;margin-top:6px}
+.ng{font-size:12px;color:var(--muted);font-weight:700;margin:12px 0 2px}
 .sync{font-size:12px;color:#dfe5f2;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:0;padding:4px 9px;border-radius:99px;cursor:pointer}
 .dot{width:8px;height:8px;border-radius:50%;background:#9aa3b5;display:inline-block}
 .dot.ok{background:#6fd08f}.dot.pend{background:var(--gold)}.dot.err{background:#ff7a6e}
@@ -186,15 +199,15 @@ ol.steps{padding-left:20px;margin:6px 0}ol.steps li{margin:5px 0;font-size:13.5p
 </style>
 </head>
 <body>
-<header class="top"><div class="in"><h1 id="title">兩人減脂</h1><button class="sync" data-act="syncNow"><span class="dot" id="syncDot"></span><span id="syncTxt">本機</span></button></div><div class="stitch"></div></header>
+<header class="top"><div class="in"><h1 id="title">減脂 \Fight/</h1><button class="bell" data-act="notif" aria-label="通知" id="bellBtn"></button><button class="sync" data-act="syncNow"><span class="dot" id="syncDot"></span><span id="syncTxt">本機</span></button></div><div class="stitch"></div></header>
 <main class="wrap" id="main"></main>
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div class="sheet hidden" id="sheet"><div class="sheet-bg" data-act="closeSheet"></div><div class="sheet-body" id="sheetBody"></div></div>
 <div id="restBox"></div>
-<script src="js/data.js?v=2.4.0"></script>
-<script src="js/art.js?v=2.4.0"></script>
-<script src="js/chars.js?v=2.4.0"></script>
-<script src="js/views.js?v=2.4.0"></script>
-<script src="js/app.js?v=2.4.0"></script>
+<script src="js/data.js?v=2.4.1"></script>
+<script src="js/art.js?v=2.4.1"></script>
+<script src="js/chars.js?v=2.4.1"></script>
+<script src="js/views.js?v=2.4.1"></script>
+<script src="js/app.js?v=2.4.1"></script>
 </body>
 </html>

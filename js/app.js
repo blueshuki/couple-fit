@@ -54,7 +54,6 @@ function setSyncUI() {
   if (S.pending.length) { dot.classList.add('pend'); tx.textContent = '待上傳 ' + S.pending.length; return; }
   dot.classList.add('ok'); tx.textContent = '已同步';
 }
-async function pingLine() { try { const j = await api('ping'); S.line = j.line || null; persist(); return j; } catch (e) { return null; } }
 function isEditing() { const a = document.activeElement; return UI.sheetOpen || (a && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName)); }
 function safeRender() { if (isEditing()) UI.needRender = true; else render(); }
 setInterval(() => { if (document.visibilityState === 'visible' && S.cfg.apiUrl) syncNow(); }, 45000);
@@ -67,13 +66,19 @@ function closeSheet() { $('#sheet').classList.add('hidden'); $('#sheetBody').inn
 
 /* ---------- Render ---------- */
 const TABS = [['home', '總覽'], ['food', '飲食'], ['gym', '運動'], ['body', '身體'], ['set', '設定']];
+function setBell() {
+  const b = $('#bellBtn'); if (!b) return;
+  let n = 0; try { n = unseenCount(); } catch (e) { console.error(e); }
+  b.style.display = hasProfile(me()) ? '' : 'none';
+  b.innerHTML = icon('bell') + (n ? `<span class="badge">${n > 9 ? '9+' : n}</span>` : '');
+}
 function render() {
   const A = nameOf('A'), B = nameOf('B');
-  $('#title').innerHTML = `${esc(A)} <span class="amp">&amp;</span> ${esc(B)}`; document.title = `${A} & ${B}｜兩人減脂`;
+  $('#title').innerHTML = `${esc(A)} <span class="amp">&amp;</span> ${esc(B)}`; document.title = `${A} & ${B}｜減脂 \\Fight/`;
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="${UI.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}">${icon(k)}${l}</button>`).join('');
   const fn = { home: viewHome, food: viewFood, gym: viewGym, body: viewBody, set: viewSet }[UI.tab];
   let html; try { html = fn(); } catch (e) { console.error(e); html = `<div class="card"><b>畫面發生錯誤</b><div class="small muted">${esc(e.message)}</div><div class="tiny muted mt8">請截圖給開發者。資料不會遺失。</div></div>`; }
-  $('#main').innerHTML = html; setSyncUI();
+  $('#main').innerHTML = html; setSyncUI(); setBell();
   if (UI.tab === 'set') refreshPreview();
   if (UI.tab === 'body') { const f = $('#phFile'); if (f) f.addEventListener('change', onPhotoFile); if ($('#cmpBox')) loadCompare(); }
 }
@@ -201,13 +206,12 @@ function sheetCheer() {
     <div class="chips">${CHEER_QUICK.map(t => `<button data-act="cheerQuick" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <label class="f">或自己寫</label><input type="text" id="cheerTxt" maxlength="60" placeholder="想說的話">
     <button class="btn gold block mt12" data-act="sendCheer">送出</button>
-    <div class="tiny muted mt8">對方打開 App 會看到；有設定 LINE 的話也會收到通知。</div>`);
+    <div class="tiny muted mt8">對方打開 App 時，右上角的鈴鐺會亮起。</div>`);
 }
 function sendCheer(msg) {
   msg = (msg || '').trim(); if (!msg) { toast('寫點什麼吧'); return; }
   const o = otherUid(me());
   put({ id: newId('ch'), uid: me(), type: 'cheer', date: todayStr(), data: { to: o, msg, hm: nowHM() } });
-  if (S.cfg.apiUrl) api('notify', { to: o, text: `${nameOf(me())} 給你應援：${msg}` }).catch(() => { });
   closeSheet(); toast('已送出'); render();
 }
 
@@ -369,14 +373,16 @@ const ACT = {
     toast('已儲存'); UI.draft = null; UI.tab = 'home'; render();
   },
   testApi: async () => { S.cfg.apiUrl = $('#cfgUrl').value.trim(); S.cfg.token = $('#cfgTok').value.trim(); persist();
-    try { const j = await api('ping'); S.line = j.line || null; persist(); toast('連線成功' + (j.ai ? '，AI 已啟用' : '，但 AI 金鑰尚未設定') + (j.drive ? '' : '，雲端硬碟未授權'), 3500); render(); } catch (e) { toast('失敗：' + e.message, 4000); } },
+    try { const j = await api('ping'); toast('連線成功' + (j.ai ? '，AI 已啟用' : '，但 AI 金鑰尚未設定') + (j.drive ? '' : '，雲端硬碟未授權'), 3500); render(); } catch (e) { toast('失敗：' + e.message, 4000); } },
   saveCfg: async () => { S.cfg.apiUrl = $('#cfgUrl').value.trim(); S.cfg.token = $('#cfgTok').value.trim();
     if (S.cfg.apiUrl && !/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(S.cfg.apiUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(S.cfg.apiUrl)) toast('網址格式通常是 https://script.google.com/macros/s/…/exec', 3500);
     Object.keys(S.records).forEach(id => { if (!S.pending.includes(id)) S.pending.push(id); });
-    S.lastTs = 0; persist(); await syncNow(); await pingLine(); toast(S.syncErr ? '同步失敗：' + S.syncErr : '已同步', 3000); render(); },
-  guideShortcut: () => sheetShortcutGuide(), guideLine: () => sheetLineGuide(),
+    S.lastTs = 0; persist(); await syncNow(); toast(S.syncErr ? '同步失敗：' + S.syncErr : '已同步', 3000); render(); },
+  guideShortcut: () => sheetShortcutGuide(),
+  notif: () => { sheetNotif(); markNotifSeen(); persist(); setBell(); },
+  notifGo: el => { const n = notifications().find(x => x.id === el.dataset.id); closeSheet(); if (!n) return; if (n.act === 'tab') { UI.tab = n.v; window.scrollTo(0, 0); render(); } else if (ACT[n.act]) ACT[n.act](el); },
   exportJson: () => { const blob = new Blob([JSON.stringify({ app: 'c17', v: APP_VERSION, at: new Date().toISOString(), records: S.records }, null, 1)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `兩人減脂備份_${todayStr()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); },
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `減脂Fight備份_${todayStr()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); },
   importJson: () => { const i = $('#impFile'); i.onchange = async () => { try { const j = JSON.parse(await i.files[0].text()); if (!j.records) throw new Error('不是備份檔'); let n = 0;
       Object.values(j.records).forEach(r => { const l = S.records[r.id]; if (!l || num(r.updatedAt) > num(l.updatedAt)) { S.records[r.id] = r; if (!S.pending.includes(r.id)) S.pending.push(r.id); n++; } });
       persist(); queueSync(); toast(`已匯入 ${n} 筆`); render(); } catch (e) { toast('匯入失敗：' + e.message); } }; i.click(); },
@@ -419,4 +425,5 @@ document.addEventListener('focusout', () => { setTimeout(() => { if (UI.needRend
 /* ---------- 啟動 ---------- */
 if (S.cfg.me) UI.editUid = S.cfg.me;
 render();
-if (S.cfg.apiUrl) { syncNow(); pingLine(); }
+if (S.cfg.apiUrl) { syncNow(); }
+setInterval(setBell, 5 * 60e3);  // 跨過 20:00 等時間點時更新鈴鐺
