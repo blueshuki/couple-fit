@@ -537,7 +537,7 @@ function viewSet() {
     <input type="file" id="impFile" accept="application/json,.json" style="display:none">
     <div class="tiny muted mt8">雲端本身就是一份備份（Google 試算表）；這裡是額外的保險。</div></div>
     <div class="card"><h2>關於</h2><div class="row"><div class="grow small muted">版本 ${APP_VERSION} · 本機共 ${Object.keys(S.records).length} 筆資料</div>${catSVG('orange', 'sit', 30)}${catSVG('tabby', 'sit', 30)}</div>
-    <button class="btn sm danger mt8" data-act="resetLocal">清除這支手機的資料</button></div>`;
+    <div class="row mt8"><button class="btn sm" data-act="checkUpdate">檢查更新</button><button class="btn sm danger" data-act="resetLocal">清除這支手機的資料</button></div></div>`;
   return h;
 }
 function appearanceHTML(eu, p, av) {

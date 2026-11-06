@@ -445,3 +445,36 @@ if (S.cfg.me) UI.editUid = S.cfg.me;
 render();
 if (S.cfg.apiUrl) { syncNow(); }
 setInterval(setBell, 5 * 60e3);  // 跨過 20:00 等時間點時更新鈴鐺
+
+/* ---------- 自動檢查更新 ----------
+   每次打開 App、從背景切回來、以及每 30 分鐘，讀一次 version.json（不使用快取）。
+   有新版就在畫面底部顯示「更新」橫幅；點了會用新網址重新載入，避開 iPhone 的舊快取。 */
+const verNum = v => String(v || '').split('.').map(n => +n || 0).reduce((a, n) => a * 1000 + n, 0);
+let updLatest = null;
+async function checkUpdate(manual) {
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error(r.status);
+    const j = await r.json(); updLatest = j.v;
+    if (verNum(j.v) > verNum(APP_VERSION)) {
+      let tried = ''; try { tried = sessionStorage.getItem('updTried') || ''; } catch (e) { }
+      showUpdateBar(j.v, tried === j.v);
+    } else { hideUpdateBar(); if (manual) toast('已經是最新版 ' + APP_VERSION); }
+  } catch (e) { if (manual) toast('檢查更新失敗，請確認網路'); }
+}
+function showUpdateBar(v, retry) {
+  let b = $('#updBar');
+  if (!b) { b = document.createElement('div'); b.id = 'updBar'; b.className = 'updbar'; document.body.appendChild(b); }
+  b.innerHTML = retry
+    ? `<span class="grow">新版本 ${esc(v)} 還在發布中，過幾分鐘再試</span><button data-act="doUpdate" data-v="${esc(v)}">再試一次</button>`
+    : `<span class="grow">有新版本 ${esc(v)}</span><button data-act="doUpdate" data-v="${esc(v)}">立即更新</button>`;
+}
+function hideUpdateBar() { const b = $('#updBar'); if (b) b.remove(); }
+ACT.doUpdate = el => {
+  const v = el.dataset.v; try { sessionStorage.setItem('updTried', v); } catch (e) { }
+  persist(); location.replace(location.pathname + '?u=' + encodeURIComponent(v) + '-' + Date.now());
+};
+ACT.checkUpdate = () => checkUpdate(true);
+if (/[?&]u=/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { } }
+checkUpdate();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkUpdate(); setBell(); } });
+setInterval(() => checkUpdate(), 30 * 60e3);
