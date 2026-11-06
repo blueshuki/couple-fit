@@ -2,7 +2,7 @@
 /* =========================================================
    兩人減脂 v2 — 資料、計算、解讀邏輯
    ========================================================= */
-const APP_VERSION = '2.4.1';
+const APP_VERSION = '2.4.2';
 const LS_KEY = 'c17_state_v1';
 
 /* ---------- 工具 ---------- */
@@ -72,7 +72,7 @@ const DEF_AVATAR = {
 function defProfile(uid) {
   return {
     name: uid === 'A' ? 'Inge' : '17', sex: 'F', birthYear: 1995, height: 160, startWeight: 60, goalWeight: 55,
-    life: 1.35, pace: 0.5, trainDays: 3, tdeeOverride: 0, cycleLen: 28, periodLen: 5, remind: true,
+    life: 1.35, pace: 0.5, trainDays: 3, tdeeOverride: 0, cycleLen: 28, periodLen: 5, remind: true, macroMode: 'auto', macroP: 30, macroC: 45, macroF: 25,
     avatar: Object.assign({}, DEF_AVATAR[uid]), setup: false,
   };
 }
@@ -172,8 +172,40 @@ function firstOfRange(uid, key, from, to) { const rs = recs('daily', uid).filter
 function waterTarget(uid) { return Math.round(trendWeight(uid) * 33 / 100) * 100; }
 
 /* ---------- 熱量目標 ---------- */
-function targets(uid) {
-  const p = profile(uid); const w = trendWeight(uid); const h = num(p.height) || 160; const notes = [];
+/* ---------- 三大營養素比例 ----------
+   auto：依體重算（蛋白質 1.8 g/kg 參考體重、脂肪至少 25%，其餘給碳水），適合減脂
+   其他：依熱量佔比換算成克數；自訂時三項會自動按比例湊成 100%              */
+const MACRO_PRESETS = {
+  auto: { name: '自動', hint: '減脂建議：蛋白質依體重算（1.8 g/kg），脂肪至少 25%，其餘給碳水' },
+  cut: { name: '減脂', p: 35, c: 35, f: 30, hint: '高蛋白、碳水適中' },
+  recomp: { name: '增肌減脂', p: 30, c: 45, f: 25, hint: '碳水多一點，撐住重訓表現' },
+  bulk: { name: '增肌', p: 25, c: 50, f: 25, hint: '需搭配熱量盈餘才有效' },
+  custom: { name: '自訂', hint: '自己設定三項百分比' },
+};
+function macroPct(p) {
+  const m = MACRO_PRESETS[p.macroMode] ? p.macroMode : 'auto'; if (m === 'auto') return null;
+  const src = m === 'custom' ? { p: num(p.macroP), c: num(p.macroC), f: num(p.macroF) } : MACRO_PRESETS[m];
+  const sum = src.p + src.c + src.f; if (!(sum > 0)) return null;
+  return { p: src.p * 100 / sum, c: src.c * 100 / sum, f: src.f * 100 / sum, raw: sum };
+}
+function macroGrams(p, kcal, refW) {
+  const pc = macroPct(p);
+  if (!pc) { const pr = 1.8 * refW, fat = Math.max(0.7 * refW, kcal * 0.25 / 9); return { p: pr, f: fat, c: Math.max(50, (kcal - pr * 4 - fat * 9) / 4) }; }
+  return { p: kcal * pc.p / 400, c: kcal * pc.c / 400, f: kcal * pc.f / 900 };
+}
+function macroWarnings(p, tg) {
+  const out = []; const pc = macroPct(p);
+  if (p.macroMode === 'custom' && pc && Math.round(pc.raw) !== 100) out.push(`三項合計 ${r0(pc.raw)}%，會自動按比例換算成 100%。`);
+  const gpk = tg.p / tg.refW, fatPct = tg.f * 900 / tg.kcal;
+  if (gpk < 1.6) out.push(`蛋白質只有 ${r1(gpk)} g/kg，建議至少 1.6（減脂時不容易掉肌肉，增肌時才長得上去）。`);
+  if (gpk > 2.6) out.push(`蛋白質 ${r1(gpk)} g/kg，超過 2.2～2.6 後多出來的幫助不大，可以把熱量讓給碳水。`);
+  if (fatPct < 20) out.push(`脂肪只佔 ${r0(fatPct)}%，長期低於 20% 可能影響荷爾蒙與經期。`);
+  if (tg.c < 100 && num(p.trainDays) >= 3) out.push(`碳水只有 ${tg.c}g，每週練 ${num(p.trainDays)} 次的話，重訓表現可能會下降。`);
+  if (p.macroMode === 'bulk' && tg.deficit > 0) out.push('目前熱量仍是赤字（目標體重低於現在），只調比例不會變成增肌。想專心增肌，要把目標體重設成等於或高於現在的體重。');
+  return out;
+}
+function targets(uid, pOver) {
+  const p = pOver || profile(uid); const w = trendWeight(uid); const h = num(p.height) || 160; const notes = [];
   const bmr = 10 * w + 6.25 * h - 5 * age(p) + (p.sex === 'M' ? 5 : -161);
   const trainAllow = clamp(num(p.trainDays), 0, 7) * 300 / 7;
   const est = bmr * num(p.life || 1.35) + trainAllow;
@@ -188,8 +220,9 @@ function targets(uid) {
   const floor = Math.max(p.sex === 'M' ? 1500 : 1200, bmr);
   if (deficit > 0 && kcal < floor) { kcal = floor; notes.push('熱量不低於基礎代謝（' + r0(floor) + '）'); }
   const refW = Math.min(w, 25 * (h / 100) ** 2);
-  const pr = 1.8 * refW, fat = Math.max(0.7 * refW, kcal * 0.25 / 9), carb = Math.max(50, (kcal - pr * 4 - fat * 9) / 4);
-  return { bmr, est, tdee, trainAllow, deficit, kcal: Math.round(kcal / 10) * 10, p: r0(pr), f: r0(fat), c: r0(carb), fib: r0(Math.max(20, kcal / 1000 * 14)), na: 2300, water: waterTarget(uid), w, refW, notes, toGoal };
+  kcal = Math.round(kcal / 10) * 10;
+  const mg = macroGrams(p, kcal, refW);
+  return { bmr, est, tdee, trainAllow, deficit, kcal, p: r0(mg.p), f: r0(mg.f), c: r0(mg.c), macroMode: MACRO_PRESETS[p.macroMode] ? p.macroMode : 'auto', fib: r0(Math.max(20, kcal / 1000 * 14)), na: 2300, water: waterTarget(uid), w, refW, notes, toGoal };
 }
 function adaptiveTdee(uid) {
   const t = todayStr(); const start = addDays(t, -28); const days = [];

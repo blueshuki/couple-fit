@@ -358,6 +358,14 @@ const ACT = {
   photoPose: el => { UI.photo.pose = el.dataset.v; UI.photo.a = UI.photo.b = ''; render(); },
   photoAdd: () => { if (!S.cfg.apiUrl) { toast('請先完成雲端設定'); return; } $('#phFile').click(); },
   // 設定
+  macroMode: el => {
+    const p = readProfileForm(); const v = el.dataset.v;
+    if (v === 'custom' && p.macroMode !== 'custom') {  // 帶入目前這組的實際佔比，讓使用者從這裡微調
+      const tg = targets(UI.draft.uid, p); const five = x => Math.round(x / 5) * 5;
+      p.macroP = five(tg.p * 400 / tg.kcal); p.macroF = five(tg.f * 900 / tg.kcal); p.macroC = 100 - p.macroP - p.macroF;
+    }
+    p.macroMode = v; render();
+  },
   editUid: el => { UI.editUid = el.dataset.uid; UI.draft = null; UI.previewStage = null; render(); },
   previewStage: el => { UI.previewStage = el.dataset.v; $$('[data-act="previewStage"]').forEach(b => b.classList.toggle('on', b === el)); refreshPreview(); },
   sw: el => { const k = el.dataset.k; const av = UI.draft.p.avatar;

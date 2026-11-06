@@ -452,6 +452,7 @@ function viewBody() {
     ${num(p.tdeeOverride) > 0 ? `<span style="color:var(--navy);font-weight:700">目前使用實測 TDEE</span><b style="float:right">${r0(p.tdeeOverride)} kcal</b><br>` : ''}
     − 赤字（每週 ${p.pace} kg）<b style="float:right">${r0(tg.deficit)} kcal</b>
     <div class="hr"></div>每日目標<b style="float:right">${tg.kcal} kcal</b><br>
+    三大營養素：${MACRO_PRESETS[tg.macroMode].name}（蛋白質 ${r0(tg.p * 400 / tg.kcal)}%／碳水 ${r0(tg.c * 400 / tg.kcal)}%／脂肪 ${r0(tg.f * 900 / tg.kcal)}%）<br>
     蛋白質 ${tg.p}g（${r1(tg.p / tg.refW)} g/kg）· 脂肪 ${tg.f}g · 碳水 ${tg.c}g · 纖維 ${tg.fib}g · 鈉 < ${tg.na}mg · 水 ${tg.water}ml</div>
     ${tg.notes.map(n => `<div class="tiny muted mt8">・${esc(n)}</div>`).join('')}
     <div class="hr"></div><div class="small"><b>實測 TDEE</b>（用實際記錄反推，最準）<br>
@@ -518,6 +519,7 @@ function viewSet() {
     <label class="f">平常（不含健身房）的活動量</label><select data-pf="life">${lifeOpts.map(o => `<option value="${o[0]}" ${num(p.life) === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
     <label class="f">每週想減多少</label><select data-pf="pace">${paceOpts.map(o => `<option value="${o[0]}" ${num(p.pace) === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
     <label class="f">每週重訓次數</label><select data-pf="trainDays">${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${num(p.trainDays) === n ? 'selected' : ''}>${n} 次</option>`).join('')}</select>
+    ${macroHTML(p)}
     ${p.sex === 'F' ? `<div class="grid2"><div><label class="f">平常週期天數</label><input type="number" data-pf="cycleLen" value="${p.cycleLen}"></div><div><label class="f">經期天數</label><input type="number" data-pf="periodLen" value="${p.periodLen}"></div></div><div class="tiny muted mt8">記錄 2 次以上經期後，會改用實際平均週期。</div>` : ''}
     <label class="row small mt12"><input type="checkbox" data-pf="remind" ${p.remind !== false ? 'checked' : ''}> App 內提醒（還沒量體重、飲食記錄太少、體組成報告該更新時，鈴鐺會亮）</label>
     ${appearanceHTML(eu, p, av)}
@@ -561,7 +563,7 @@ function swRow(label, key, list, cur) { return `<label class="f">${label}</label
 function previewFat(p) { const h = num(p.height) / 100; const u = UI.draft && UI.draft.uid; const w = u && weights(u).length ? trendWeight(u) : num(p.startWeight); return h ? clamp((w / (h * h) - 18.5) / (33 - 18.5), 0, 1) : 0.3; }
 function readProfileForm() {
   const p = UI.draft.p;
-  $$('[data-pf]').forEach(el => { const k = el.dataset.pf; if (el.type === 'checkbox') p[k] = el.checked; else if (['name', 'sex'].includes(k)) p[k] = el.value; else p[k] = num(el.value); });
+  $$('[data-pf]').forEach(el => { const k = el.dataset.pf; if (el.type === 'checkbox') p[k] = el.checked; else if (['name', 'sex', 'macroMode'].includes(k)) p[k] = el.value; else p[k] = num(el.value); });
   $$('[data-av]').forEach(el => { p.avatar[el.dataset.av] = el.type === 'checkbox' ? el.checked : el.value; });
   return p;
 }
@@ -569,6 +571,7 @@ function refreshPreview() {
   const p = readProfileForm(); const box = $('#avPrev'); if (!box) return;
   box.innerHTML = renderAvatar(UI.draft.uid, p.avatar, previewFat(p), { expr: p.avatar.expr === 'auto' ? 'calm' : p.avatar.expr, stage: UI.previewStage });
   const h = num(p.height) / 100, g = num(p.goalWeight); const el = $('#goalChk');
+  macroPreview(p);
   if (el && h && g) { const bmi = g / (h * h); el.textContent = `目標 BMI ${r1(bmi)}` + (bmi < 18.5 ? '，低於 18.5 屬體重過輕，建議把目標放在增肌或維持。' : (bmi < 20 ? '，已在偏瘦範圍，之後建議以腰圍和力量進步為主要目標。' : '')); }
 }
 function syncStatusText() {
@@ -606,4 +609,25 @@ function sheetNotif() {
   openSheet(`<h3>${icon('bell')} 通知<button class="btn sm ghost x" data-act="closeSheet">關閉</button></h3>
     ${list.length ? grp('今天待辦', todo) + grp('提醒', info) + grp('動態與應援', msg) : `<div class="row" style="justify-content:center;padding:18px 0;gap:6px">${catSVG('orange', 'sit', 34)}<div class="small muted">目前沒有新通知，今天的事都做完了。</div></div>`}
     <div class="tiny muted mt12">待辦做完會自動消失；應援和動態保留 7 天。</div>`);
+}
+
+/* ---------- 三大營養素比例設定 ---------- */
+function macroHTML(p) {
+  const m = MACRO_PRESETS[p.macroMode] ? p.macroMode : 'auto'; const pre = MACRO_PRESETS[m];
+  const val = k => m === 'custom' ? num(p['macro' + k]) : (pre[k.toLowerCase()] != null ? pre[k.toLowerCase()] : '');
+  let h = `<label class="f">三大營養素比例（佔每日熱量）</label>
+    <input type="hidden" data-pf="macroMode" value="${m}">
+    <div class="seg rwrap">${Object.entries(MACRO_PRESETS).map(([k, o]) => `<button class="${m === k ? 'on' : ''}" data-act="macroMode" data-v="${k}">${o.name}</button>`).join('')}</div>
+    <div class="tiny muted mt8">${esc(pre.hint)}</div>`;
+  if (m !== 'auto') h += `<div class="grid3 mt8">${[['P', '蛋白質'], ['C', '碳水'], ['F', '脂肪']].map(([k, n]) =>
+    `<div><label class="f">${n} %</label><input type="number" inputmode="numeric" step="5" min="5" max="70" data-pf="macro${k}" value="${val(k)}" ${m === 'custom' ? '' : 'disabled'}></div>`).join('')}</div>`;
+  if (m !== 'auto' && m !== 'custom') h += `<div class="tiny muted mt8">想微調的話，按「自訂」會帶入這組數字讓你改。</div>`;
+  return h + '<div id="macroChk" class="small mt8"></div>';
+}
+function macroPreview(p) {
+  const el = $('#macroChk'); if (!el || !UI.draft) return;
+  const tg = targets(UI.draft.uid, p); const w = macroWarnings(p, tg);
+  el.innerHTML = `<div class="note" style="margin:0">每日 <b>${tg.kcal}</b> kcal → 蛋白質 <b>${tg.p}</b>g（${r1(tg.p / tg.refW)} g/kg）· 碳水 <b>${tg.c}</b>g · 脂肪 <b>${tg.f}</b>g
+    <div class="tiny muted">實際佔比：${r0(tg.p * 400 / tg.kcal)}% ／ ${r0(tg.c * 400 / tg.kcal)}% ／ ${r0(tg.f * 900 / tg.kcal)}%</div></div>`
+    + w.map(x => `<div class="tiny mt8" style="color:#b0552f">⚠ ${esc(x)}</div>`).join('');
 }
