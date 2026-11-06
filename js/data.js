@@ -2,7 +2,7 @@
 /* =========================================================
    兩人減脂 v2 — 資料、計算、解讀邏輯
    ========================================================= */
-const APP_VERSION = '2.4.4';
+const APP_VERSION = '2.4.5';
 const LS_KEY = 'c17_state_v1';
 
 /* ---------- 工具 ---------- */
@@ -255,13 +255,32 @@ function progressPct(uid) {
   return clamp((s - w) / (s - g) * 100, 0, 100);
 }
 // 定稿人物身形：依「目標進度」決定，不用 BMI 絕對值（不評價體型）
-function bodyStage(uid) {
-  const p = profile(uid); const s = num(p.startWeight), g = num(p.goalWeight), w = trendWeight(uid);
-  if (g < s) { if (w >= s * 1.04) return 'round'; if (w >= s * 1.02) return 'soft'; }
-  const pct = progressPct(uid);
-  return pct >= 100 ? 'lean_toned' : pct >= 50 ? 'fit' : 'neutral';
+// 起點身形、達標身形可在外觀設定調整（預設：圓潤 → 中等）。
+// 中間的身形依進度平均分配，並提早一點點換（例如 圓潤→中等：進度 40% 變豐潤、90% 變中等）。
+// 體重比起始多 2% 以上，會比起點再圓一階（起點已是圓潤就維持）。
+const STAGE_NAMES = { lean_toned: '結實', fit: '勻稱', neutral: '中等', soft: '豐潤', round: '圓潤' };
+const STAGE_ORDER = ['lean_toned', 'fit', 'neutral', 'soft', 'round'];  // 由瘦到圓
+function stageRange(av) {
+  let a = STAGE_ORDER.indexOf((av && av.stageStart) || 'round'), b = STAGE_ORDER.indexOf((av && av.stageGoal) || 'neutral');
+  if (a < 0) a = 4; if (b < 0) b = 2; if (b > a) b = a;
+  return { a, b };
 }
-const STAGE_NAMES = { lean_toned: '結實', fit: '勻稱', neutral: '起點', soft: '豐潤', round: '圓潤' };
+function bodyStage(uid, avOver) {
+  const p = profile(uid); const av = avOver || p.avatar || {}; const { a, b } = stageRange(av);
+  const s = num(p.startWeight), g = num(p.goalWeight), w = trendWeight(uid);
+  if (!(s > 0) || !(w > 0)) return STAGE_ORDER[a];
+  if (g < s && w >= s * 1.02) return STAGE_ORDER[Math.min(4, a + 1)];
+  const steps = a - b; if (!steps) return STAGE_ORDER[a];
+  const prog = Math.abs(s - g) < 0.1 ? 1 : (s - w) / (s - g);
+  const k = clamp(Math.floor(prog * steps + 0.2 + 1e-6), 0, steps);
+  return STAGE_ORDER[a - k];
+}
+function stageRule(av) {
+  const { a, b } = stageRange(av); const steps = a - b;
+  if (!steps) return `身形固定為「${STAGE_NAMES[STAGE_ORDER[a]]}」。`;
+  const marks = []; for (let k = 1; k <= steps; k++) marks.push(`進度 ${Math.max(0, Math.round((k - 0.2) / steps * 100))}% ${STAGE_NAMES[STAGE_ORDER[a - k]]}`);
+  return `從「${STAGE_NAMES[STAGE_ORDER[a]]}」開始 → ${marks.join(' → ')}（100% 就是達到目標體重）。${a < 4 ? '體重比起始多 2% 以上會再圓一階。' : ''}`;
+}
 function baseName(pct) { return pct >= 100 ? '回本壘得分' : pct >= 75 ? '三壘' : pct >= 50 ? '二壘' : pct >= 25 ? '一壘' : '打擊區'; }
 function eta(uid) {
   const p = profile(uid); const w = trendWeight(uid); const g = num(p.goalWeight); const diff = w - g;

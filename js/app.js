@@ -426,7 +426,8 @@ document.addEventListener('change', e => {
   if (c === 'phA' || c === 'phB') { UI.photo[c === 'phA' ? 'a' : 'b'] = el.value; UI.photo.manual = true; loadCompare(); return; }
   if (c === 'aiOn') { UI.ai.items[+el.dataset.i].on = el.checked; el.closest('.ai-item').classList.toggle('off', !el.checked); aiTotals(); return; }
   if (el.id === 'aiMeal' && UI.ai) { UI.ai.meal = el.value; const b = $('[data-act="aiSave"],[data-act="lbSave"]'); if (b) b.textContent = '加入' + el.value; return; }
-  if ((el.dataset.pf || el.dataset.av) && UI.tab === 'set') { if (el.dataset.pf === 'sex' || el.dataset.av === 'outfit' || el.dataset.av === 'charV2') { readProfileForm(); render(); return; } refreshPreview(); }
+  if ((el.dataset.pf || el.dataset.av) && UI.tab === 'set') { if (el.dataset.av === 'stageStart' || el.dataset.av === 'stageGoal') { UI.previewStage = null; readProfileForm(); render(); return; }
+    if (el.dataset.pf === 'sex' || el.dataset.av === 'outfit' || el.dataset.av === 'charV2') { readProfileForm(); render(); return; } refreshPreview(); }
 });
 document.addEventListener('input', e => {
   const el = e.target; const a = UI.ai; const k = el.dataset.inp;

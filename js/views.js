@@ -555,8 +555,13 @@ function appearanceHTML(eu, p, av) {
   else if (v2) { const oid = v2OutfitId(Object.assign({}, av, { outfit: cur })); v2Recolor(eu, oid).forEach(([r, lb]) => { const O = CHAR_CACHE[eu + '/' + oid]; h += swRow(lb || V2_ROLE_NAMES[r] || r, 'oc:' + r, SW_CLOTH, (av.oc && av.oc[oid] && av.oc[oid][r]) || (O && O.colors[r]) || ''); }); }
   else h += swRow('上衣', 'top', SW_CLOTH, av.top) + swRow(av.outfit === 'dress' ? '裙子' : '褲子', 'bottom', SW_CLOTH, av.bottom) + swRow('滾邊／條紋', 'trim', SW_CLOTH, av.trim);
   h += swRow('髮色', 'hairColor', SW_HAIR, av.hairColor) + swRow('膚色', 'skin', SW_SKIN, av.skin);
-  if (v2) h += `<label class="f">預覽身形（實際會依目標進度自動變化）</label><div class="seg">${CHAR_STAGES.map(k => `<button class="${(UI.previewStage || (hasProfile(eu) ? bodyStage(eu) : 'neutral')) === k ? 'on' : ''}" data-act="previewStage" data-v="${k}">${STAGE_NAMES[k]}</button>`).join('')}</div>
-    <div class="tiny muted mt8">身形依目標進度變化：起點 → 進度 50% 勻稱 → 達標結實；體重比起始多 2% 豐潤、多 4% 圓潤。</div>`;
+  if (v2) {
+    const stOpt = (key, def) => STAGE_ORDER.slice().reverse().map(k => `<option value="${k}" ${((av[key] || def) === k) ? 'selected' : ''}>${STAGE_NAMES[k]}</option>`).join('');
+    h += `<div class="grid2 mt8"><div><label class="f">現在的身形（起點）</label><select data-av="stageStart">${stOpt('stageStart', 'round')}</select></div>
+      <div><label class="f">達到目標體重時</label><select data-av="stageGoal">${stOpt('stageGoal', 'neutral')}</select></div></div>
+      <div class="tiny muted mt8" id="stageRule">${esc(stageRule(av))}</div>
+      <label class="f">預覽身形</label><div class="seg">${CHAR_STAGES.map(k => `<button class="${(UI.previewStage || (hasProfile(eu) ? bodyStage(eu, av) : 'round')) === k ? 'on' : ''}" data-act="previewStage" data-v="${k}">${STAGE_NAMES[k]}</button>`).join('')}</div>`;
+  }
   else h += '<div class="tiny muted mt8">人物身形會隨「7 日平均體重」慢慢改變；表情選「自動」時，會依當天睡眠、訓練、飲食變化。</div>';
   return h;
 }
@@ -570,7 +575,8 @@ function readProfileForm() {
 }
 function refreshPreview() {
   const p = readProfileForm(); const box = $('#avPrev'); if (!box) return;
-  box.innerHTML = renderAvatar(UI.draft.uid, p.avatar, previewFat(p), { expr: p.avatar.expr === 'auto' ? 'calm' : p.avatar.expr, stage: UI.previewStage });
+  const rule = $('#stageRule'); if (rule) rule.textContent = stageRule(p.avatar);
+  box.innerHTML = renderAvatar(UI.draft.uid, p.avatar, previewFat(p), { expr: p.avatar.expr === 'auto' ? 'calm' : p.avatar.expr, stage: UI.previewStage || (hasProfile(UI.draft.uid) ? bodyStage(UI.draft.uid, p.avatar) : null) });
   const h = num(p.height) / 100, g = num(p.goalWeight); const el = $('#goalChk');
   macroPreview(p);
   if (el && h && g) { const bmi = g / (h * h); el.textContent = `目標 BMI ${r1(bmi)}` + (bmi < 18.5 ? '，低於 18.5 屬體重過輕，建議把目標放在增肌或維持。' : (bmi < 20 ? '，已在偏瘦範圍，之後建議以腰圍和力量進步為主要目標。' : '')); }
