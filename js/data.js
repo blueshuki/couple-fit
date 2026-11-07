@@ -2,7 +2,7 @@
 /* =========================================================
    兩人減脂 v2 — 資料、計算、解讀邏輯
    ========================================================= */
-const APP_VERSION = '2.4.5';
+const APP_VERSION = '2.4.6';
 const LS_KEY = 'c17_state_v1';
 
 /* ---------- 工具 ---------- */
@@ -107,8 +107,65 @@ const BUILTIN_FOODS = [
   ['大腸包小腸', '1份', 550, 18, 60, 26, 2, 1300, '球場'], ['炸雞排', '1片', 600, 35, 30, 37, 1, 1100, '球場'], ['烤香腸', '1根', 250, 9, 10, 19, 0, 600, '球場'],
   ['薯條', '中份', 350, 4, 45, 17, 4, 300, '球場'], ['熱狗堡', '1個', 300, 10, 30, 16, 1, 800, '球場'], ['爆米花', '中份', 400, 5, 50, 20, 7, 400, '球場'],
   ['啤酒', '330ml', 140, 1, 11, 0, 0, 10, '球場'], ['無糖茶', '1瓶', 0, 0, 0, 0, 0, 10, '球場'],
+  ['豆干', '2片 70g', 130, 13, 3, 7, 1, 250], ['蝦仁', '100g 熟', 100, 21, 0, 1.5, 0, 200], ['透抽／花枝', '100g 熟', 90, 18, 2, 1, 0, 300], ['低脂鮮奶', '240ml', 110, 8, 12, 2.5, 0, 100],
 ].map((a, i) => ({ id: 'bi' + i, name: a[0], unit: a[1], kcal: a[2], p: a[3], c: a[4], f: a[5], fib: a[6], na: a[7], tag: a[8] || '', builtin: true }));
 const PROTEIN_PICKS = ['即食雞胸肉', '無糖豆漿', '希臘優格（無糖）', '水煮蛋', '乳清蛋白', '板豆腐', '白肉魚（鯛魚）', '毛豆仁'];
+// 依時段推薦的蛋白質來源（建議卡會輪替，並優先用你們自己常吃的）
+const PROTEIN_BY_SLOT = {
+  早餐: ['水煮蛋', '茶葉蛋', '無糖豆漿', '希臘優格（無糖）', '低脂鮮奶', '即食雞胸肉'],
+  正餐: ['即食雞胸肉', '雞腿肉（去皮）', '豬里肌', '瘦牛肉', '鮭魚', '白肉魚（鯛魚）', '板豆腐', '毛豆仁', '蝦仁', '透抽／花枝', '豆干'],
+  點心: ['希臘優格（無糖）', '無糖豆漿', '乳清蛋白', '茶葉蛋', '豆干', '即食雞胸肉', '低脂鮮奶'],
+};
+const FOOD_SHORT = { '白肉魚（鯛魚）': '鯛魚', '希臘優格（無糖）': '無糖希臘優格', '雞腿肉（去皮）': '去皮雞腿', '透抽／花枝': '透抽' };
+function foodLabel(name, unit) {
+  const n = FOOD_SHORT[name] || name; const u = String(unit || '').replace(/^(\d+g) 熟$/, '熟重 $1');
+  return u ? `${n} ${u}` : n;
+}
+function seededPick(arr, k, seed) {  // 同一天同時段結果固定，換時段或多記一筆就換
+  const a = arr.slice(); let x = seed || 1; const out = [];
+  while (a.length && out.length < k) { x = (x * 9301 + 49297) % 233280; out.push(a.splice(Math.floor(x / 233280 * a.length), 1)[0]); }
+  return out;
+}
+function strSeed(s) { let h = 7; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 100003; return h; }
+// 近 30 天自己記過、蛋白質佔熱量 25% 以上的食物，依次數排序；記下常在哪一餐吃
+function ownProteinFoods(uid) {
+  const from = addDays(todayStr(), -30), m = {};
+  Object.values(S.records).forEach(r => {
+    if (r.type !== 'food' || r.uid !== uid || r.deleted || r.date < from) return;
+    const d = r.data, q = num(d.qty) || 1, p = num(d.p) * q, k = num(d.kcal) * q, nm = String(d.name || '').trim();
+    if (!nm || p < 8 || !(k > 0) || p * 4 / k < 0.25) return;
+    if (!m[nm]) m[nm] = { name: nm, p: r0(p), kcal: r0(k), n: 0, meals: {}, own: true };
+    m[nm].n++; if (d.meal) m[nm].meals[d.meal] = 1;
+  });
+  return Object.values(m).sort((a, b) => b.n - a.n).slice(0, 8);
+}
+function proteinAdvice(uid, remP, remK, nEnt) {
+  const now = new Date(), h = now.getHours() + now.getMinutes() / 60;
+  const slot = h < 10.5 ? '早餐' : h < 14 ? '午餐' : h < 17 ? '下午點心' : h < 20.5 ? '晚餐' : '宵夜';
+  const meal = slot === '下午點心' || slot === '宵夜' ? '點心' : slot;
+  const pool = PROTEIN_BY_SLOT[slot === '早餐' ? '早餐' : meal === '點心' ? '點心' : '正餐'];
+  const budget = Math.max(remK, 160);
+  const seed = strSeed(uid + todayStr() + slot + nEnt);
+  const builtin = pool.map(n => BUILTIN_FOODS.find(f => f.name === n)).filter(f => f && f.kcal <= budget)
+    .map(f => ({ name: f.name, unit: f.unit, p: f.p, kcal: f.kcal }));
+  // 自己吃過的：只推薦「曾在這一餐吃過」的（早餐不會推烤雞腿，除非你早餐真的吃過）
+  const own = ownProteinFoods(uid).filter(f => f.kcal <= budget && f.meals[meal]);
+  let picks = seededPick(builtin, 2, seed);
+  if (own.length && seed % 5 < 3) { const o = seededPick(own, 1, seed + 3)[0]; picks = [o, ...picks.filter(f => f.name !== o.name)].slice(0, 2); }
+  const X = r0(remP); if (!picks.length) return `蛋白質還差 ${X} g。`;
+  const lab = f => f.own ? f.name : foodLabel(f.name, f.unit);
+  if (slot === '宵夜' && remP > 40) {
+    const best = [...picks, ...builtin].sort((a, b) => b.p - a.p)[0];
+    return `今天蛋白質還差 ${X} g，差得比較多。睡前補一份${lab(best)}（約 ${best.p} g）就好，不用硬塞完，明天早餐先放蛋白質。`;
+  }
+  const [A, B] = picks; const sum = r0(picks.reduce((s, f) => s + f.p, 0)); const t = seed % 3;
+  if (A.own && t !== 1) {
+    const who = A.n >= 3 ? '你常吃的' : '你之前吃過的';
+    return `蛋白質還差 ${X} g。${who}「${A.name}」一份約 ${A.p} g，${slot}來一份${A.p >= remP * 0.8 ? '就差不多達標了' : '可以先補上一部分'}。`;
+  }
+  if (t === 1 && B) return `離蛋白質目標還有 ${X} g。${slot}吃${lab(A)}＋${lab(B)}，大約可以補 ${sum} g。`;
+  return `蛋白質還差 ${X} g。${slot}可以選${lab(A)}（約 ${A.p} g）${B ? `，或${lab(B)}（約 ${B.p} g）` : ''}。`;
+}
 
 /* ---------- 運動資料 ---------- */
 const EX_LIB = [
@@ -462,9 +519,7 @@ function adviceFor(uid) {
     const remK = t.kcal - s.kcal, remP = t.p - s.p;
     if (remK < -150) L.push(`今天已超過目標 ${r0(-remK)} kcal。不用補償性少吃，明天照原計畫就好，單日超出對趨勢影響很小。`);
     if (remP > 20) {
-      const budget = Math.max(remK, 160);
-      const picks = PROTEIN_PICKS.map(n => BUILTIN_FOODS.find(f => f.name === n)).filter(f => f && f.kcal <= budget).sort((a, b) => b.p / b.kcal - a.p / a.kcal).slice(0, 2);
-      L.push(`蛋白質還差 ${r0(remP)} g` + (picks.length ? `，例如：${picks.map(f => `${f.name} ${f.unit}（${f.p}g）`).join('、')}。` : '。'));
+      L.push(proteinAdvice(uid, remP, remK, ents.length));
     } else if (remP <= 0 && L.length < 2) L.push('蛋白質已達標。');
     if (s.kcal > 600 && s.f * 9 / s.kcal > 0.4) L.push(`脂肪占今日熱量 ${r0(s.f * 9 / s.kcal * 100)}%，下一餐優先選清蒸、水煮、滷（去皮去肥）。`);
     if (s.naKnown >= 2 && s.na > 3000) L.push(`今天鈉已約 ${r0(s.na / 100) * 100} mg，下一餐少湯少醬、多喝水，明天體重偏高也別緊張。`);
